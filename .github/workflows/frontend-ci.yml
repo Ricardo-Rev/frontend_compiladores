@@ -1,0 +1,32 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [develop, main]
+
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Verificar ESLint
+        run: npm run lint
+
+      - name: Compilar proyecto
+        run: npm run build
