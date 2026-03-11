@@ -1,0 +1,35 @@
+:root {
+  /* FONDO */
+  --bg-deep: #050810;
+  --bg-card: #0a0f1e;
+  --bg-panel: #0d1425;
+  --bg-elevated: #111827;
+
+  /* BORDES */
+  --border: rgba(99, 179, 237, 0.12);
+  --border-glow: rgba(99, 179, 237, 0.35);
+
+  /* ACCENTS  */
+  --accent: #38bdf8;
+  --accent2: #818cf8;
+  --accent3: #34d399;
+
+  /* COLORES DE ESTADO  */
+  --danger: #f87171; /*PELIGRO*/
+  --warning: #fbbf24; /*ADVERTENCIA*/
+
+  /*TEXTO*/
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #475569;
+
+  /*DIFUMINADO*/
+  --glow-blue: 0 0 20px rgba(56, 189, 248, 0.3), 0 0 60px rgba(56, 189, 248, 0.1);
+  --glow-purple: 0 0 20px rgba(129, 140, 248, 0.3), 0 0 60px rgba(129, 140, 248, 0.1);
+  --glow-green: 0 0 20px rgba(52, 211, 153, 0.3);
+
+  /*TIPOGRAFIA*/
+  --font-ui: 'Space Grotesk', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-brand: 'Orbitron', sans-serif;
+}
