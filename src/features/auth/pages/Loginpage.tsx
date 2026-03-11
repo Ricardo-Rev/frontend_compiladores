@@ -5,10 +5,7 @@ import { LoginForm } from '../components/LoginForm';
 export function LoginPage() {
   return (
     <AuthLayout>
-      <AuthCard
-        title="Acceso seguro"
-        subtitle="Ingresa tus credenciales para continuar."
-      >
+      <AuthCard title="Acceso seguro" subtitle="Ingresa tus credenciales para continuar.">
         <LoginForm />
       </AuthCard>
     </AuthLayout>

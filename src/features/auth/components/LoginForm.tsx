@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '../../../shared/components/ui/Button';
 import { Input } from '../../../shared/components/ui/Input';
-import { loginUser } from '../services/authServices'
+import { loginUser } from '../services/authServices';
 import { AuthActions } from './AuthActions';
 import { RecaptchaPlaceholder } from './RecaptchaPlaceholder';
 

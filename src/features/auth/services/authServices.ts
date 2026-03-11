@@ -1,8 +1,4 @@
-import type {
-  AuthResponse,
-  LoginRequest,
-  RegisterRequest,
-} from '../types/auth.types';
+import type { AuthResponse, LoginRequest, RegisterRequest } from '../types/auth.types';
 
 /**
  * Servicio de autenticación.
@@ -12,9 +8,7 @@ import type {
  * responsable de conexión con endpoints.
  */
 
-export async function loginUser(
-  payload: LoginRequest,
-): Promise<AuthResponse> {
+export async function loginUser(payload: LoginRequest): Promise<AuthResponse> {
   console.log('Pendiente integración endpoint login:', payload);
 
   return Promise.resolve({
@@ -23,9 +17,7 @@ export async function loginUser(
   });
 }
 
-export async function registerUser(
-  payload: RegisterRequest,
-): Promise<AuthResponse> {
+export async function registerUser(payload: RegisterRequest): Promise<AuthResponse> {
   console.log('Pendiente integración endpoint register:', payload);
 
   return Promise.resolve({

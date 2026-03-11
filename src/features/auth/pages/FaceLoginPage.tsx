@@ -6,17 +6,12 @@ import { AuthLayout } from '../components/AuthLayout';
 export function FaceLoginPage() {
   return (
     <AuthLayout>
-      <AuthCard
-        title="Reconocimiento facial"
-        subtitle="Activa la cámara y valida tu identidad."
-      >
+      <AuthCard title="Reconocimiento facial" subtitle="Activa la cámara y valida tu identidad.">
         <div className="auth-placeholder-box">
           [ Aquí irá la vista previa de cámara / reconocimiento ]
         </div>
 
-        <Button fullWidth>
-          Activar cámara
-        </Button>
+        <Button fullWidth>Activar cámara</Button>
 
         <Link to="/login">
           <Button type="button" variant="secondary" fullWidth>

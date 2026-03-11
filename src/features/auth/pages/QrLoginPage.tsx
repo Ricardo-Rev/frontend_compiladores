@@ -6,14 +6,8 @@ import { AuthLayout } from '../components/AuthLayout';
 export function QrLoginPage() {
   return (
     <AuthLayout>
-      <AuthCard
-        title="Acceso con QR"
-        subtitle="Escanea el código con tu dispositivo autorizado."
-      >
+      <AuthCard title="Acceso con QR" subtitle="Escanea el código con tu dispositivo autorizado.">
         <div className="auth-placeholder-box">[ Aquí irá el QR dinámico ]</div>
-
-
-        
 
         <Link to="/login">
           <Button type="button" variant="secondary" fullWidth>
