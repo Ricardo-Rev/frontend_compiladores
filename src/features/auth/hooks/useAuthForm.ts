@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { loginUser, registerUser } from '../services/authServices';
 import type { LoginRequest, RegisterRequest } from '../types/auth.types';
@@ -16,13 +17,17 @@ export function useLoginForm() {
     try {
       const response = await loginUser(data);
       login(response.access_token, response.user);
-      navigate('/profile');
+      toast.success(`¡Bienvenido, ${response.user.usuario}! 👋`);
+      navigate('/dashboard');
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'response' in err) {
         const axiosErr = err as { response?: { data?: { error?: string } } };
-        setError(axiosErr.response?.data?.error ?? 'Error al iniciar sesión.');
+        const msg = axiosErr.response?.data?.error ?? 'Error al iniciar sesión.';
+        setError(msg);
+        toast.error(msg);
       } else {
         setError('Error al iniciar sesión.');
+        toast.error('Error al iniciar sesión.');
       }
     } finally {
       setIsLoading(false);
@@ -44,13 +49,17 @@ export function useRegisterForm() {
     try {
       const response = await registerUser(data);
       login(response.access_token, response.user);
-      navigate('/profile');
+      toast.success(`¡Cuenta creada exitosamente! Bienvenido, ${response.user.usuario} 🎉`);
+      navigate('/dashboard');
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'response' in err) {
         const axiosErr = err as { response?: { data?: { error?: string } } };
-        setError(axiosErr.response?.data?.error ?? 'Error al registrarse.');
+        const msg = axiosErr.response?.data?.error ?? 'Error al registrarse.';
+        setError(msg);
+        toast.error(msg);
       } else {
         setError('Error al registrarse.');
+        toast.error('Error al registrarse.');
       }
     } finally {
       setIsLoading(false);
