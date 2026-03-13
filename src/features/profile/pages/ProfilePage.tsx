@@ -49,18 +49,7 @@ const IconMail = () => (
     <polyline points="22,6 12,13 2,6"/>
   </svg>
 );
-const IconPhone = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13 19.79 19.79 0 0 1 1.62 4.36 2 2 0 0 1 3.59 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.16 6.16l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
-  </svg>
-);
-const IconCalendar = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-    <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-    <line x1="3" y1="10" x2="21" y2="10"/>
-  </svg>
-);
+// ✅ FIX: IconPhone e IconCalendar eliminados — no se usan en el JSX
 const IconShield = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -81,6 +70,7 @@ export function ProfilePage() {
       .then((data) => setUser(data as UserDto))
       .catch(() => { logout(); navigate('/login'); })
       .finally(() => setIsLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleLogout = async () => {
@@ -121,7 +111,6 @@ export function ProfilePage() {
       <div style={styles.bgOrb1} />
       <div style={styles.bgOrb2} />
 
-      {/* SIDEBAR */}
       <aside style={{ ...styles.sidebar, width: sidebarOpen ? '240px' : '68px' }}>
         <div style={styles.sidebarLogo}>
           <div style={styles.logoIcon}><IconCpu /></div>
@@ -162,7 +151,6 @@ export function ProfilePage() {
         </button>
       </aside>
 
-      {/* MAIN */}
       <main style={styles.main}>
         <header style={styles.topbar}>
           <div>
@@ -172,8 +160,6 @@ export function ProfilePage() {
         </header>
 
         <div style={styles.profileGrid}>
-
-          {/* ── TARJETA AVATAR ── */}
           <div style={styles.avatarCard}>
             <div style={styles.avatarWrapper}>
               {avatarSrc ? (
@@ -184,50 +170,29 @@ export function ProfilePage() {
               <button onClick={handleAvatarClick} style={styles.avatarEditBtn} title="Cambiar foto">
                 <IconCamera />
               </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                style={{ display: 'none' }}
-                onChange={handleAvatarChange}
-              />
+              <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
             </div>
-
             <h2 style={styles.avatarName}>{user?.nombre_completo}</h2>
             <p style={styles.avatarUsername}>@{user?.usuario}</p>
-
-            <div style={styles.roleBadge}>
-              <IconShield />
-              {user?.rol}
-            </div>
-
+            <div style={styles.roleBadge}><IconShield />{user?.rol}</div>
             <div style={styles.avatarDivider} />
-
             <p style={styles.avatarJoined}>
               Miembro desde<br />
               <strong style={{ color: 'var(--text-primary)' }}>
-                {new Date(user?.fecha_creacion ?? '').toLocaleDateString('es-GT', {
-                  year: 'numeric', month: 'long', day: 'numeric'
-                })}
+                {new Date(user?.fecha_creacion ?? '').toLocaleDateString('es-GT', { year: 'numeric', month: 'long', day: 'numeric' })}
               </strong>
             </p>
-
-            <button onClick={handleLogout} style={styles.logoutFullBtn}>
-              <IconLogout />
-              Cerrar sesión
-            </button>
+            <button onClick={handleLogout} style={styles.logoutFullBtn}><IconLogout />Cerrar sesión</button>
           </div>
 
-          {/* ── DATOS DE CUENTA ── */}
           <div style={styles.infoPanel}>
             <h3 style={styles.infoPanelTitle}>Información de la cuenta</h3>
-
             <div style={styles.infoGrid}>
               {[
-                { icon: <IconUser />,     label: 'Nombre completo', value: user?.nombre_completo ?? '—' },
-                { icon: <IconUser />,     label: 'Usuario',         value: `@${user?.usuario}` },
-                { icon: <IconMail />,     label: 'Correo electrónico', value: user?.email ?? '—' },
-                { icon: <IconShield />,   label: 'Rol',             value: user?.rol ?? '—' },
+                { icon: <IconUser />,   label: 'Nombre completo',    value: user?.nombre_completo ?? '—' },
+                { icon: <IconUser />,   label: 'Usuario',            value: `@${user?.usuario}` },
+                { icon: <IconMail />,   label: 'Correo electrónico', value: user?.email ?? '—' },
+                { icon: <IconShield />, label: 'Rol',                value: user?.rol ?? '—' },
               ].map((field) => (
                 <div key={field.label} style={styles.infoField}>
                   <div style={styles.infoFieldIcon}>{field.icon}</div>
@@ -239,7 +204,6 @@ export function ProfilePage() {
               ))}
             </div>
 
-            {/* Estado de verificación */}
             <h3 style={{ ...styles.infoPanelTitle, marginTop: '2rem' }}>Estado de verificación</h3>
             <div style={styles.verifyGrid}>
               {[
@@ -248,25 +212,19 @@ export function ProfilePage() {
               ].map((item) => (
                 <div key={item.label} style={styles.verifyRow}>
                   <span style={styles.verifyLabel}>{item.label}</span>
-                  <span style={{
-                    ...styles.verifyBadge,
-                    background: item.verified ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)',
-                    color: item.verified ? 'var(--accent3)' : 'var(--danger)',
-                    border: `1px solid ${item.verified ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)'}`,
-                  }}>
+                  <span style={{ ...styles.verifyBadge, background: item.verified ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)', color: item.verified ? 'var(--accent3)' : 'var(--danger)', border: `1px solid ${item.verified ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)'}` }}>
                     {item.verified ? '✓ Verificado' : '✗ Sin verificar'}
                   </span>
                 </div>
               ))}
             </div>
 
-            {/* Preferencias del editor */}
             <h3 style={{ ...styles.infoPanelTitle, marginTop: '2rem' }}>Preferencias del editor</h3>
             <div style={styles.prefsGrid}>
               {[
-                { label: 'Tema',     value: 'Dark' },
-                { label: 'Fuente',   value: 'Fira Code' },
-                { label: 'Tamaño',   value: '14px' },
+                { label: 'Tema',                 value: 'Dark' },
+                { label: 'Fuente',               value: 'Fira Code' },
+                { label: 'Tamaño',               value: '14px' },
                 { label: 'Lenguaje por defecto', value: 'Python' },
               ].map((pref) => (
                 <div key={pref.label} style={styles.prefItem}>
@@ -282,7 +240,6 @@ export function ProfilePage() {
   );
 }
 
-// ── ESTILOS ──────────────────────────────────────────────────
 const styles: Record<string, React.CSSProperties> = {
   shell: { display: 'flex', minHeight: '100vh', background: 'var(--bg-deep)', position: 'relative', overflow: 'hidden', fontFamily: 'var(--font-ui)' },
   bgOrb1: { position: 'fixed', top: '-20%', left: '-10%', width: '600px', height: '600px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(56,189,248,0.06) 0%, transparent 70%)', pointerEvents: 'none', zIndex: 0 },
@@ -309,11 +266,7 @@ const styles: Record<string, React.CSSProperties> = {
   topbar: { marginBottom: '2rem' },
   topbarSub: { color: 'var(--text-muted)', fontSize: '0.875rem', margin: 0 },
   topbarTitle: { color: 'var(--text-primary)', fontSize: '1.75rem', fontWeight: '700', margin: '0.25rem 0 0', fontFamily: 'var(--font-brand)', letterSpacing: '1px' },
-
-  // LAYOUT
   profileGrid: { display: 'grid', gridTemplateColumns: '280px 1fr', gap: '1.5rem', alignItems: 'start' },
-
-  // AVATAR CARD
   avatarCard: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'sticky', top: '2rem' },
   avatarWrapper: { position: 'relative', marginBottom: '1.25rem' },
   avatarImg: { width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--accent)' },
@@ -325,8 +278,6 @@ const styles: Record<string, React.CSSProperties> = {
   avatarDivider: { width: '100%', height: '1px', background: 'var(--border)', margin: '1.25rem 0' },
   avatarJoined: { color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: '1.6', margin: '0 0 1.25rem' },
   logoutFullBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%', padding: '0.75rem', background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--danger)', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', fontSize: '0.875rem' },
-
-  // INFO PANEL
   infoPanel: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '2rem' },
   infoPanelTitle: { color: 'var(--text-secondary)', fontSize: '0.78rem', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 1.25rem' },
   infoGrid: { display: 'flex', flexDirection: 'column', gap: '0.75rem' },
@@ -335,14 +286,10 @@ const styles: Record<string, React.CSSProperties> = {
   infoFieldContent: { display: 'flex', flexDirection: 'column', gap: '0.1rem' },
   infoFieldLabel: { color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px' },
   infoFieldValue: { color: 'var(--text-primary)', fontSize: '0.9rem', fontWeight: '500' },
-
-  // VERIFY
   verifyGrid: { display: 'flex', flexDirection: 'column', gap: '0.6rem' },
   verifyRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-elevated)', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid var(--border)' },
   verifyLabel: { color: 'var(--text-secondary)', fontSize: '0.85rem' },
   verifyBadge: { borderRadius: '20px', padding: '0.2rem 0.75rem', fontSize: '0.75rem', fontWeight: '600' },
-
-  // PREFS
   prefsGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' },
   prefItem: { background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' },
   prefLabel: { color: 'var(--text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px' },
