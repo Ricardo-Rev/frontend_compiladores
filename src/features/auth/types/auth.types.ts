@@ -1,24 +1,30 @@
 export interface LoginRequest {
-  username: string;
+  email: string;
   password: string;
-  recaptchaToken?: string;
+  recaptcha_token: string;
 }
 
 export interface RegisterRequest {
-  fullName: string;
-  username: string;
+  usuario: string;
   email: string;
+  nombre_completo: string;
   password: string;
-  confirmPassword: string;
-  recaptchaToken?: string;
+  telefono: string;
+  recaptcha_token: string;
+}
+
+export interface UserDto {
+  id: number;
+  usuario: string;
+  nombre_completo: string;
+  email: string;
+  rol: string;
+  avatar_url: string | null;
+  fecha_creacion: string;
 }
 
 export interface AuthResponse {
-  success: boolean;
-  message: string;
-  token?: string;
+  access_token: string;
+  expires_in_seconds: number;
+  user: UserDto;
 }
-
-/*Definición de forma de los datos como 
-se pedira para que no haya errores de 
-envio o de recepción */

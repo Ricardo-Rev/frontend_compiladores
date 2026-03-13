@@ -2,35 +2,33 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '../../../shared/components/ui/Button';
 import { Input } from '../../../shared/components/ui/Input';
-import { loginUser } from '../services/authServices';
-import { AuthActions } from './AuthActions';
 import { RecaptchaPlaceholder } from './RecaptchaPlaceholder';
+import { AuthActions } from './AuthActions';
+import { useLoginForm } from '../hooks/useAuthForm';
 
 export function LoginForm() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [message, setMessage] = useState('');
+  const { handleLogin, isLoading, error } = useLoginForm();
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    const response = await loginUser({
-      username,
+    await handleLogin({
+      email,
       password,
-      recaptchaToken: 'pending-recaptcha-token',
+      recaptcha_token: 'test-token-bypass',
     });
-
-    setMessage(response.message);
   }
 
   return (
     <form className="auth-form" onSubmit={handleSubmit}>
       <Input
-        id="login-username"
-        label="Usuario"
-        placeholder="Ingresa tu usuario"
-        value={username}
-        onChange={(event) => setUsername(event.target.value)}
+        id="login-email"
+        label="Correo electrónico"
+        type="email"
+        placeholder="Ingresa tu correo"
+        value={email}
+        onChange={(event) => setEmail(event.target.value)}
       />
 
       <Input
@@ -44,8 +42,12 @@ export function LoginForm() {
 
       <RecaptchaPlaceholder />
 
-      <Button type="submit" fullWidth>
-        Iniciar sesión
+      {error && (
+        <p className="auth-form__message">{error}</p>
+      )}
+
+      <Button type="submit" fullWidth disabled={isLoading}>
+        {isLoading ? 'Iniciando sesión...' : 'Iniciar sesión'}
       </Button>
 
       <AuthActions />
@@ -53,8 +55,6 @@ export function LoginForm() {
       <p className="auth-form__footer">
         ¿No tienes cuenta? <Link to="/register">Regístrate</Link>
       </p>
-
-      {message ? <p className="auth-form__message">{message}</p> : null}
     </form>
   );
 }

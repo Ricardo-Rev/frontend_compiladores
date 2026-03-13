@@ -2,53 +2,54 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '../../../shared/components/ui/Button';
 import { Input } from '../../../shared/components/ui/Input';
-import { registerUser } from '../services/authServices';
 import { RecaptchaPlaceholder } from './RecaptchaPlaceholder';
+import { useRegisterForm } from '../hooks/useAuthForm';
 
 export function RegisterForm() {
-  const [fullName, setFullName] = useState('');
-  const [username, setUsername] = useState('');
+  const [nombreCompleto, setNombreCompleto] = useState('');
+  const [usuario, setUsuario] = useState('');
   const [email, setEmail] = useState('');
+  const [telefono, setTelefono] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [message, setMessage] = useState('');
+  const [localError, setLocalError] = useState<string | null>(null);
+  const { handleRegister, isLoading, error } = useRegisterForm();
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setLocalError(null);
 
     if (password !== confirmPassword) {
-      setMessage('Las contraseñas no coinciden.');
+      setLocalError('Las contraseñas no coinciden.');
       return;
     }
 
-    const response = await registerUser({
-      fullName,
-      username,
+    await handleRegister({
+      usuario,
       email,
+      nombre_completo: nombreCompleto,
       password,
-      confirmPassword,
-      recaptchaToken: 'pending-recaptcha-token',
+      telefono,
+      recaptcha_token: 'test-token-bypass',
     });
-
-    setMessage(response.message);
   }
 
   return (
     <form className="auth-form" onSubmit={handleSubmit}>
       <Input
-        id="register-fullname"
+        id="register-nombre"
         label="Nombre completo"
-        placeholder="Ingresa tu nombre"
-        value={fullName}
-        onChange={(event) => setFullName(event.target.value)}
+        placeholder="Ingresa tu nombre completo"
+        value={nombreCompleto}
+        onChange={(event) => setNombreCompleto(event.target.value)}
       />
 
       <Input
-        id="register-username"
+        id="register-usuario"
         label="Usuario"
         placeholder="Crea un nombre de usuario"
-        value={username}
-        onChange={(event) => setUsername(event.target.value)}
+        value={usuario}
+        onChange={(event) => setUsuario(event.target.value)}
       />
 
       <Input
@@ -61,10 +62,18 @@ export function RegisterForm() {
       />
 
       <Input
+        id="register-telefono"
+        label="Teléfono"
+        placeholder="+502 1234-5678"
+        value={telefono}
+        onChange={(event) => setTelefono(event.target.value)}
+      />
+
+      <Input
         id="register-password"
         label="Contraseña"
         type="password"
-        placeholder="Crea una contraseña"
+        placeholder="Mínimo 8 caracteres"
         value={password}
         onChange={(event) => setPassword(event.target.value)}
       />
@@ -73,22 +82,23 @@ export function RegisterForm() {
         id="register-confirm-password"
         label="Confirmar contraseña"
         type="password"
-        placeholder="Confirma tu contraseña"
+        placeholder="Repite tu contraseña"
         value={confirmPassword}
         onChange={(event) => setConfirmPassword(event.target.value)}
       />
 
       <RecaptchaPlaceholder />
 
-      <Button type="submit" fullWidth>
-        Registrarse
+      {localError && <p className="auth-form__message">{localError}</p>}
+      {error && <p className="auth-form__message">{error}</p>}
+
+      <Button type="submit" fullWidth disabled={isLoading}>
+        {isLoading ? 'Registrando...' : 'Registrarse'}
       </Button>
 
       <p className="auth-form__footer">
         ¿Ya tienes cuenta? <Link to="/login">Inicia sesión</Link>
       </p>
-
-      {message ? <p className="auth-form__message">{message}</p> : null}
     </form>
   );
 }

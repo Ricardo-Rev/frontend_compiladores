@@ -1,45 +1,46 @@
-import type { AuthResponse, LoginRequest, RegisterRequest } from '../types/auth.types';
+import axios from 'axios';
+import type { LoginRequest, RegisterRequest, AuthResponse } from '../types/auth.types';
 
-/**
- * Servicio de autenticación.
- *
- * Este archivo queda preparado para la integración con backend.
- * La implementación real de llamadas HTTP será realizada por el
- * responsable de conexión con endpoints.
- */
+const api = axios.create({
+  baseURL: 'http://localhost:5123',
+  headers: { 'Content-Type': 'application/json' },
+});
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('rover_token');
+      localStorage.removeItem('rover_user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 export async function loginUser(payload: LoginRequest): Promise<AuthResponse> {
-  console.log('Pendiente integración endpoint login:', payload);
-
-  return Promise.resolve({
-    success: false,
-    message: 'Integración de login pendiente.',
-  });
+  const response = await api.post<AuthResponse>('/api/Auth/login', payload);
+  return response.data;
 }
 
 export async function registerUser(payload: RegisterRequest): Promise<AuthResponse> {
-  console.log('Pendiente integración endpoint register:', payload);
-
-  return Promise.resolve({
-    success: false,
-    message: 'Integración de registro pendiente.',
-  });
+  const response = await api.post<AuthResponse>('/api/Auth/register', payload);
+  return response.data;
 }
 
-export async function requestQrLogin(): Promise<AuthResponse> {
-  console.log('Pendiente integración endpoint QR login');
-
-  return Promise.resolve({
-    success: false,
-    message: 'Integración de acceso por QR pendiente.',
+export async function logoutUser(): Promise<void> {
+  const token = localStorage.getItem('rover_token');
+  await api.post('/api/Auth/logout', {}, {
+    headers: { Authorization: `Bearer ${token}` },
   });
+  localStorage.removeItem('rover_token');
+  localStorage.removeItem('rover_user');
 }
 
-export async function requestFaceLogin(): Promise<AuthResponse> {
-  console.log('Pendiente integración endpoint Face ID login');
-
-  return Promise.resolve({
-    success: false,
-    message: 'Integración de reconocimiento facial pendiente.',
+export async function getMe(): Promise<AuthResponse['user']> {
+  const token = localStorage.getItem('rover_token');
+  const response = await api.get('/api/Auth/me', {
+    headers: { Authorization: `Bearer ${token}` },
   });
+  return response.data;
 }
