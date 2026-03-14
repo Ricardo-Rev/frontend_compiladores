@@ -11,6 +11,7 @@ export interface RegisterRequest {
   password: string;
   telefono: string;
   recaptcha_token: string;
+  avatar_base64?: string; // ✅ foto capturada por cámara o subida
 }
 
 export interface UserDto {
