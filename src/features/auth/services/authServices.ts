@@ -2,7 +2,7 @@ import axios from 'axios';
 import type { LoginRequest, RegisterRequest, AuthResponse } from '../types/auth.types';
 
 const api = axios.create({
-  baseURL: 'http://localhost:5123',
+  baseURL: import.meta.env.VITE_API_URL,
   headers: { 'Content-Type': 'application/json' },
 });
 
