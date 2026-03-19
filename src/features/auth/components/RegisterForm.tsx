@@ -1,10 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '../../../shared/components/ui/Button';
 import { Input } from '../../../shared/components/ui/Input';
 import { RecaptchaPlaceholder } from './RecaptchaPlaceholder';
 import { useRegisterForm } from '../hooks/useAuthForm';
-import { segmentFace } from '../services/authServices';
+import { segmentFace, getAvatares } from '../services/authServices';
+import type { AvatarDto } from '../types/auth.types';
+
 
 type FotoMode = 'none' | 'camera' | 'preview';
 type Step = 1 | 2 | 3;
@@ -30,7 +32,14 @@ export function RegisterForm() {
   const fileRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const [avatares, setAvatares] = useState<AvatarDto[]>([]);
+  const [avatarSeleccionado, setAvatarSeleccionado] = useState<AvatarDto | null>(null);
+
   const { handleRegister, isLoading, error } = useRegisterForm();
+
+useEffect(() => {
+  getAvatares().then(res => setAvatares(res.avatares)).catch(() => {});
+}, []);
 
   const abrirCamara = async () => {
     try {
@@ -126,7 +135,10 @@ export function RegisterForm() {
         password,
         telefono,
         recaptcha_token: recaptchaToken,
-        avatar_base64: avatarBase64 ?? undefined,
+        avatar_base64: avatarSeleccionado
+          ? `data:image/svg+xml;base64,${btoa(avatarSeleccionado.svg)}`
+          : avatarBase64 ?? undefined,
+        foto_facial_base64: avatarBase64 ?? undefined,  // ← agregar esto
       };
 
       console.log("📤 DATA:", payload);
@@ -171,7 +183,9 @@ export function RegisterForm() {
 
         {step === 2 && (
           <div style={s.section}>
-            <h3 style={{ textAlign: 'center' }}>Foto de perfil</h3>
+
+            {/* ── FOTO FACIAL ─────────────────────── */}
+            <h3 style={{ textAlign: 'center' }}>📸 Foto para reconocimiento facial</h3>
 
             {fotoMode === 'none' && (
               <div style={s.row}>
@@ -179,14 +193,36 @@ export function RegisterForm() {
                 <button onClick={() => fileRef.current?.click()} type="button" style={s.btn}>🖼 Subir</button>
               </div>
             )}
+            {/* ← AGREGA ESTO AQUÍ */}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = async (ev) => {
+                  const fullData = ev.target?.result as string;
+                  try {
+                    const segmented = await segmentFace({ image_base64: fullData });
+                    setAvatarBase64(`data:image/png;base64,${segmented.resultado}`);
+                    setCameraError(null);
+                  } catch {
+                    setAvatarBase64(fullData);
+                    setCameraError("Error backend o no detecta rostro");
+                  }
+                  setFotoMode('preview');
+                };
+                reader.readAsDataURL(file);
+              }}
+            />
 
             {fotoMode === 'camera' && (
               <div style={s.cameraBox}>
                 <video ref={videoRef} style={s.video} autoPlay />
-
-                {/* 🔥 ESTE ES EL FIX */}
                 <canvas ref={canvasRef} style={{ display: 'none' }} />
-
                 <button type="button" onClick={capturarFoto} style={s.captureBtn}>
                   📸 Capturar foto
                 </button>
@@ -195,11 +231,51 @@ export function RegisterForm() {
 
             {fotoMode === 'preview' && avatarBase64 && (
               <div style={s.cameraBox}>
+                <p style={{ color: '#94a3b8', fontSize: '13px' }}>Vista previa de tu foto:</p>
                 <img src={avatarBase64} style={s.previewImg} />
+                <button type="button" style={{ ...s.btn, maxWidth: '200px' }}
+                  onClick={() => { setFotoMode('none'); setAvatarBase64(null); }}>
+                  🔄 Cambiar foto
+                </button>
               </div>
             )}
 
             {cameraError && <p style={s.error}>{cameraError}</p>}
+
+            {/* ── SELECTOR DE AVATARES ─────────────── */}
+            <h3 style={{ textAlign: 'center', marginTop: '10px' }}>🎭 Elige tu avatar</h3>
+            <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
+              Este dibujito aparecerá en tu credencial PDF
+            </p>
+
+            <div style={s.avatarGrid}>
+              {avatares.map(av => (
+                <div
+                  key={av.id}
+                  onClick={() => setAvatarSeleccionado(av)}
+                  style={{
+                    ...s.avatarItem,
+                    border: avatarSeleccionado?.id === av.id
+                      ? '3px solid #38bdf8'
+                      : '3px solid transparent',
+                  }}
+                >
+                  <div
+                    dangerouslySetInnerHTML={{ __html: av.svg }}
+                    style={{ width: '70px', height: '70px' }}
+                  />
+                  <span style={{ fontSize: '11px', color: '#94a3b8', textAlign: 'center' }}>
+                    {av.nombre}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {avatarSeleccionado && (
+              <p style={{ textAlign: 'center', color: '#38bdf8', fontSize: '13px' }}>
+                ✅ Avatar seleccionado: {avatarSeleccionado.nombre}
+              </p>
+            )}
 
             <div style={s.row}>
               <Button type="button" onClick={() => setStep(1)}>← Atrás</Button>
@@ -346,5 +422,22 @@ const s: Record<string, React.CSSProperties> = {
   error: {
     color: '#f87171',
     textAlign: 'center',
+  },
+  avatarGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, 1fr)',
+    gap: '12px',
+  },
+
+  avatarItem: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    gap: '6px',
+    padding: '10px',
+    borderRadius: '10px',
+    background: '#334155',
+    cursor: 'pointer',
+    transition: 'border 0.2s',
   },
 };
