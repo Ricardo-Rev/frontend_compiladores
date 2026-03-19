@@ -2,6 +2,7 @@ import axios from 'axios';
 import { env } from '../../../config/env';
 import type {
   AuthResponse,
+  AvatarDto,
   FacialLoginRequest,
   FaceSegmentRequest,
   FaceSegmentResponse,
@@ -87,5 +88,9 @@ export async function logoutUser(): Promise<void> {
 
 export async function getMe(): Promise<UserProfileDto> {
   const response = await api.get<UserProfileDto>('/api/auth/me');
+  return response.data;
+}
+export async function getAvatares(): Promise<{ avatares: AvatarDto[], total: number }> {
+  const response = await api.get('/api/Avatar');
   return response.data;
 }
