@@ -60,6 +60,8 @@ export function RegisterForm() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
   };
 
+  
+
   const capturarFoto = async () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -78,14 +80,12 @@ export function RegisterForm() {
     ctx?.drawImage(video, 0, 0);
 
     const fullData = canvas.toDataURL('image/jpeg', 0.9);
-    const base64 = fullData.split(',')[1]; // 🔥 FIX CLAVE
-
     console.log("📦 Base64 generado");
 
     try {
       console.log("🚀 Enviando al backend...");
 
-      const segmented = await segmentFace({ image_base64: base64 });
+      const segmented = await segmentFace({ image_base64: fullData });
 
       console.log("✅ RESPUESTA BACKEND:", segmented);
 
