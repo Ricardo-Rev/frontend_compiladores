@@ -1,9 +1,32 @@
 import axios from 'axios';
-import type { LoginRequest, RegisterRequest, AuthResponse } from '../types/auth.types';
+import { env } from '../../../config/env';
+import type {
+  AuthResponse,
+  FacialLoginRequest,
+  FaceSegmentRequest,
+  FaceSegmentResponse,
+  LoginRequest,
+  QrLoginRequest,
+  RegisterRequest,
+  UserProfileDto,
+} from '../types/auth.types';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-  headers: { 'Content-Type': 'application/json' },
+  baseURL: env.apiUrl,
+  timeout: env.apiTimeoutMs,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('rover_token');
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  return config;
 });
 
 api.interceptors.response.use(
@@ -12,35 +35,57 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('rover_token');
       localStorage.removeItem('rover_user');
-      window.location.href = '/login';
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export async function loginUser(payload: LoginRequest): Promise<AuthResponse> {
-  const response = await api.post<AuthResponse>('/api/Auth/login', payload);
+  const response = await api.post<AuthResponse>('/api/auth/login', payload);
   return response.data;
 }
 
-export async function registerUser(payload: RegisterRequest): Promise<AuthResponse> {
-  const response = await api.post<AuthResponse>('/api/Auth/register', payload);
+export async function registerUser(
+  payload: RegisterRequest,
+): Promise<AuthResponse> {
+  const response = await api.post<AuthResponse>('/api/auth/register', payload);
+  return response.data;
+}
+
+export async function loginWithQr(
+  payload: QrLoginRequest,
+): Promise<AuthResponse> {
+  const response = await api.post<AuthResponse>('/api/auth/login/qr', payload);
+  return response.data;
+}
+
+export async function loginWithFacial(
+  payload: FacialLoginRequest,
+): Promise<AuthResponse> {
+  const response = await api.post<AuthResponse>(
+    '/api/auth/login/facial',
+    payload,
+  );
+  return response.data;
+}
+
+export async function segmentFace(
+  payload: FaceSegmentRequest,
+): Promise<FaceSegmentResponse> {
+  const response = await api.post<FaceSegmentResponse>(
+    '/api/Face/segment',
+    payload,
+  );
   return response.data;
 }
 
 export async function logoutUser(): Promise<void> {
-  const token = localStorage.getItem('rover_token');
-  await api.post('/api/Auth/logout', {}, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  await api.post('/api/Auth/logout');
   localStorage.removeItem('rover_token');
   localStorage.removeItem('rover_user');
 }
 
-export async function getMe(): Promise<AuthResponse['user']> {
-  const token = localStorage.getItem('rover_token');
-  const response = await api.get('/api/Auth/me', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+export async function getMe(): Promise<UserProfileDto> {
+  const response = await api.get<UserProfileDto>('/api/auth/me');
   return response.data;
 }

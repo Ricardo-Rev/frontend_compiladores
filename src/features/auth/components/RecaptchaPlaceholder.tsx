@@ -1,10 +1,19 @@
-export function RecaptchaPlaceholder() {
+import ReCAPTCHA from 'react-google-recaptcha';
+import { useRef } from 'react';
+
+type Props = {
+  onChange: (token: string | null) => void;
+};
+
+export function RecaptchaPlaceholder({ onChange }: Props) {
+  const recaptchaRef = useRef<ReCAPTCHA | null>(null);
   return (
-    <div className="recaptcha-placeholder">
-      <span className="recaptcha-placeholder__checkbox" />
-      <span>No soy un robot (placeholder)</span>
+    <div style={{ margin: '10px 0' }}>
+      <ReCAPTCHA
+        ref={recaptchaRef}
+        sitekey="6LdofoUsAAAAABqxUKNqOJuRKxhAtP_2OfENLcJ6"
+        onChange={onChange}
+      />
     </div>
   );
 }
-
-/* Por ahora solo es visual integrarlo correctamente */
