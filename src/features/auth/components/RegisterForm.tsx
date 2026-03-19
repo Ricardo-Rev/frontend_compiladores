@@ -1,249 +1,350 @@
-import { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '../../../shared/components/ui/Button';
 import { Input } from '../../../shared/components/ui/Input';
 import { RecaptchaPlaceholder } from './RecaptchaPlaceholder';
 import { useRegisterForm } from '../hooks/useAuthForm';
+import { segmentFace } from '../services/authServices';
 
 type FotoMode = 'none' | 'camera' | 'preview';
+type Step = 1 | 2 | 3;
 
 export function RegisterForm() {
-  const [nombreCompleto, setNombreCompleto]     = useState('');
-  const [usuario, setUsuario]                   = useState('');
-  const [email, setEmail]                       = useState('');
-  const [telefono, setTelefono]                 = useState('');
-  const [password, setPassword]                 = useState('');
-  const [confirmPassword, setConfirmPassword]   = useState('');
-  const [localError, setLocalError]             = useState<string | null>(null);
-  const [avatarBase64, setAvatarBase64]         = useState<string | null>(null);
-  const [fotoMode, setFotoMode]                 = useState<FotoMode>('none');
-  const [cameraError, setCameraError]           = useState<string | null>(null);
+  const [step, setStep] = useState<Step>(1);
 
-  const videoRef  = useRef<HTMLVideoElement>(null);
+  const [nombreCompleto, setNombreCompleto] = useState('');
+  const [usuario, setUsuario] = useState('');
+  const [email, setEmail] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
+  const [fotoMode, setFotoMode] = useState<FotoMode>('none');
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fileRef   = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   const { handleRegister, isLoading, error } = useRegisterForm();
 
-  // ── Abrir cámara ──────────────────────────────────────────
-  const abrirCamara = useCallback(async () => {
-    setCameraError(null);
+  const abrirCamara = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      console.log("📷 Abriendo cámara...");
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user' },
+      });
+
       streamRef.current = stream;
       setFotoMode('camera');
-      // El video se asigna después de que el elemento se monte
+
       setTimeout(() => {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.play();
         }
-      }, 100);
-    } catch {
-      setCameraError('No se pudo acceder a la cámara. Usa "Subir foto" en su lugar.');
+      }, 300);
+
+    } catch (err) {
+      console.error("❌ Error cámara:", err);
+      setCameraError('No se pudo acceder a la cámara');
     }
-  }, []);
+  };
 
-  const cerrarCamara = useCallback(() => {
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    streamRef.current = null;
-    setFotoMode('none');
-  }, []);
+  const cerrarCamara = () => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+  };
 
-  // ── Capturar foto desde cámara ───────────────────────────
-  const capturarFoto = useCallback(() => {
-    const video  = videoRef.current;
+  const capturarFoto = async () => {
+    const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas) return;
 
-    canvas.width  = video.videoWidth  || 320;
-    canvas.height = video.videoHeight || 240;
+    if (!video || !canvas) {
+      console.log("❌ No hay video o canvas");
+      return;
+    }
+
+    console.log("📸 Capturando...");
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
     const ctx = canvas.getContext('2d');
-    ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx?.drawImage(video, 0, 0);
 
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-    setAvatarBase64(dataUrl);
+    const fullData = canvas.toDataURL('image/jpeg', 0.9);
+    const base64 = fullData.split(',')[1]; // 🔥 FIX CLAVE
+
+    console.log("📦 Base64 generado");
+
+    try {
+      console.log("🚀 Enviando al backend...");
+
+      const segmented = await segmentFace({ image_base64: base64 });
+
+      console.log("✅ RESPUESTA BACKEND:", segmented);
+
+      setAvatarBase64(`data:image/png;base64,${segmented.resultado}`);
+      setCameraError(null);
+
+    } catch (err: unknown) {
+      console.error("❌ ERROR BACKEND:", err);
+
+      setAvatarBase64(fullData);
+      setCameraError("Error backend o no detecta rostro");
+    }
+
     setFotoMode('preview');
     cerrarCamara();
-  }, [cerrarCamara]);
-
-  // ── Subir foto desde archivo ─────────────────────────────
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      setCameraError('La imagen no debe superar 2MB.');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setAvatarBase64(ev.target?.result as string);
-      setFotoMode('preview');
-    };
-    reader.readAsDataURL(file);
   };
 
-  const eliminarFoto = () => {
-    setAvatarBase64(null);
-    setFotoMode('none');
-    setCameraError(null);
-    if (fileRef.current) fileRef.current.value = '';
-  };
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
 
-  // ── Submit ────────────────────────────────────────────────
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setLocalError(null);
+    console.log("📝 Enviando registro...");
 
     if (password !== confirmPassword) {
-      setLocalError('Las contraseñas no coinciden.');
+      setLocalError('Las contraseñas no coinciden');
       return;
     }
 
-    await handleRegister({
-      usuario,
-      email,
-      nombre_completo: nombreCompleto,
-      password,
-      telefono,
-      recaptcha_token: 'test-token-bypass',
-      avatar_base64: avatarBase64 ?? undefined,
-    });
+    if (!recaptchaToken) {
+      setLocalError('Completa el reCAPTCHA');
+      return;
+    }
+
+    try {
+      const payload = {
+        usuario,
+        email,
+        nombre_completo: nombreCompleto,
+        password,
+        telefono,
+        recaptcha_token: recaptchaToken,
+        avatar_base64: avatarBase64 ?? undefined,
+      };
+
+      console.log("📤 DATA:", payload);
+
+      await handleRegister(payload);
+
+      console.log("✅ Registro enviado correctamente");
+
+    } catch (err) {
+      console.error("❌ Error registro:", err);
+    }
   }
 
   return (
-    <form className="auth-form" onSubmit={handleSubmit}>
-      <Input
-        id="register-nombre"
-        label="Nombre completo"
-        placeholder="Ingresa tu nombre completo"
-        value={nombreCompleto}
-        onChange={(e) => setNombreCompleto(e.target.value)}
-      />
-      <Input
-        id="register-usuario"
-        label="Usuario"
-        placeholder="Crea un nombre de usuario"
-        value={usuario}
-        onChange={(e) => setUsuario(e.target.value)}
-      />
-      <Input
-        id="register-email"
-        label="Correo electrónico"
-        type="email"
-        placeholder="Ingresa tu correo"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
-      <Input
-        id="register-telefono"
-        label="Teléfono"
-        placeholder="+502 1234-5678"
-        value={telefono}
-        onChange={(e) => setTelefono(e.target.value)}
-      />
-      <Input
-        id="register-password"
-        label="Contraseña"
-        type="password"
-        placeholder="Mínimo 8 caracteres"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
-      <Input
-        id="register-confirm-password"
-        label="Confirmar contraseña"
-        type="password"
-        placeholder="Repite tu contraseña"
-        value={confirmPassword}
-        onChange={(e) => setConfirmPassword(e.target.value)}
-      />
+    <div style={s.container}>
+      <form style={s.form} onSubmit={handleSubmit}>
 
-      {/* ── SECCIÓN FOTO ── */}
-      <div style={s.fotoSection}>
-        <label style={s.fotoLabel}>
-          Foto de perfil
-          <span style={s.fotoOptional}>(opcional — aparece en tu credencial PDF)</span>
-        </label>
+        <h2 style={s.title}>Crear cuenta</h2>
 
-        {/* Estado: sin foto y sin cámara */}
-        {fotoMode === 'none' && (
-          <div style={s.fotoBtns}>
-            <button type="button" onClick={abrirCamara} style={s.fotoBtn}>
-              📷 Tomar foto
-            </button>
-            <button type="button" onClick={() => fileRef.current?.click()} style={s.fotoBtn}>
-              🖼 Subir foto
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={handleFileChange}
-            />
-          </div>
-        )}
+        <div style={s.steps}>
+          {[1,2,3].map(n => (
+            <span key={n} style={step === n ? s.activeStep : s.step}>{n}</span>
+          ))}
+        </div>
 
-        {/* Estado: cámara activa */}
-        {fotoMode === 'camera' && (
-          <div style={s.cameraBox}>
-            <video ref={videoRef} autoPlay playsInline muted style={s.video} />
-            <canvas ref={canvasRef} style={{ display: 'none' }} />
-            <div style={s.cameraBtns}>
-              <button type="button" onClick={capturarFoto} style={s.btnCapture}>
-                📸 Capturar
-              </button>
-              <button type="button" onClick={cerrarCamara} style={s.btnCancel}>
-                Cancelar
-              </button>
+        {step === 1 && (
+          <div style={s.grid}>
+            <Input label="Nombre" value={nombreCompleto} onChange={(e) => setNombreCompleto(e.target.value)} />
+            <Input label="Usuario" value={usuario} onChange={(e) => setUsuario(e.target.value)} />
+            <Input label="Correo" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Input label="Teléfono" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+            <Input label="Contraseña" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <Input label="Confirmar" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+
+            <div style={{ gridColumn: 'span 2' }}>
+              <Button type="button" onClick={() => setStep(2)}>
+                Siguiente →
+              </Button>
             </div>
           </div>
         )}
 
-        {/* Estado: foto tomada */}
-        {fotoMode === 'preview' && avatarBase64 && (
-          <div style={s.previewBox}>
-            <img src={avatarBase64} alt="Vista previa" style={s.previewImg} />
-            <button type="button" onClick={eliminarFoto} style={s.btnCancel}>
-              ✕ Quitar foto
-            </button>
+        {step === 2 && (
+          <div style={s.section}>
+            <h3 style={{ textAlign: 'center' }}>Foto de perfil</h3>
+
+            {fotoMode === 'none' && (
+              <div style={s.row}>
+                <button onClick={abrirCamara} type="button" style={s.btn}>📷 Cámara</button>
+                <button onClick={() => fileRef.current?.click()} type="button" style={s.btn}>🖼 Subir</button>
+              </div>
+            )}
+
+            {fotoMode === 'camera' && (
+              <div style={s.cameraBox}>
+                <video ref={videoRef} style={s.video} autoPlay />
+
+                {/* 🔥 ESTE ES EL FIX */}
+                <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+                <button type="button" onClick={capturarFoto} style={s.captureBtn}>
+                  📸 Capturar foto
+                </button>
+              </div>
+            )}
+
+            {fotoMode === 'preview' && avatarBase64 && (
+              <div style={s.cameraBox}>
+                <img src={avatarBase64} style={s.previewImg} />
+              </div>
+            )}
+
+            {cameraError && <p style={s.error}>{cameraError}</p>}
+
+            <div style={s.row}>
+              <Button type="button" onClick={() => setStep(1)}>← Atrás</Button>
+              <Button type="button" onClick={() => setStep(3)}>Siguiente →</Button>
+            </div>
           </div>
         )}
 
-        {cameraError && <p style={s.cameraError}>{cameraError}</p>}
-      </div>
+        {step === 3 && (
+          <div style={s.section}>
+            <RecaptchaPlaceholder onChange={setRecaptchaToken} />
 
-      <RecaptchaPlaceholder />
+            {localError && <p style={s.error}>{localError}</p>}
+            {error && <p style={s.error}>{error}</p>}
 
-      {localError && <p className="auth-form__message">{localError}</p>}
-      {error     && <p className="auth-form__message">{error}</p>}
+            <div style={s.row}>
+              <Button type="button" onClick={() => setStep(2)}>← Atrás</Button>
+              <Button type="submit">
+                {isLoading ? 'Registrando...' : 'Crear cuenta'}
+              </Button>
+            </div>
+          </div>
+        )}
 
-      <Button type="submit" fullWidth disabled={isLoading}>
-        {isLoading ? 'Registrando...' : 'Registrarse'}
-      </Button>
+        <p style={s.login}>
+          ¿Ya tienes cuenta? <Link to="/login">Login</Link>
+        </p>
 
-      <p className="auth-form__footer">
-        ¿Ya tienes cuenta? <Link to="/login">Inicia sesión</Link>
-      </p>
-    </form>
+      </form>
+    </div>
   );
 }
 
-// ── Estilos inline ────────────────────────────────────────────
 const s: Record<string, React.CSSProperties> = {
-  fotoSection:  { display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.5rem' },
-  fotoLabel:    { fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary, #e2e8f0)', display: 'flex', flexDirection: 'column', gap: '0.2rem' },
-  fotoOptional: { fontSize: '0.75rem', fontWeight: '400', color: 'var(--text-muted, #94a3b8)' },
-  fotoBtns:     { display: 'flex', gap: '0.5rem' },
-  fotoBtn:      { flex: 1, padding: '0.55rem 0.75rem', background: 'var(--bg-elevated, #1e293b)', border: '1px solid var(--border, #334155)', borderRadius: '8px', color: 'var(--text-secondary, #94a3b8)', fontSize: '0.825rem', cursor: 'pointer' },
-  cameraBox:    { display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center' },
-  video:        { width: '100%', maxWidth: '320px', borderRadius: '8px', border: '2px solid var(--accent, #38bdf8)' },
-  cameraBtns:   { display: 'flex', gap: '0.5rem', width: '100%', maxWidth: '320px' },
-  btnCapture:   { flex: 1, padding: '0.6rem', background: 'var(--accent, #38bdf8)', color: '#000', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '0.85rem' },
-  btnCancel:    { padding: '0.6rem 1rem', background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--danger, #f87171)', borderRadius: '8px', cursor: 'pointer', fontSize: '0.82rem' },
-  previewBox:   { display: 'flex', alignItems: 'center', gap: '0.75rem' },
-  previewImg:   { width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent, #38bdf8)' },
-  cameraError:  { color: 'var(--danger, #f87171)', fontSize: '0.78rem', margin: 0 },
+  container: {
+    display: 'flex',
+    justifyContent: 'center',
+    padding: '20px',
+  },
+
+  form: {
+    width: '100%',
+    maxWidth: '900px',
+    background: '#1e293b',
+    padding: '25px',
+    borderRadius: '12px',
+  },
+
+  title: {
+    textAlign: 'center',
+    marginBottom: '10px',
+  },
+
+  steps: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '10px',
+    marginBottom: '20px',
+  },
+
+  step: {
+    width: '30px',
+    height: '30px',
+    borderRadius: '50%',
+    background: '#334155',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  activeStep: {
+    width: '30px',
+    height: '30px',
+    borderRadius: '50%',
+    background: '#38bdf8',
+    color: '#000',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 'bold',
+  },
+
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '20px',
+  },
+
+  section: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '15px',
+  },
+
+  row: {
+    display: 'flex',
+    gap: '10px',
+    justifyContent: 'space-between',
+  },
+
+  cameraBox: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '15px',
+  },
+
+  btn: {
+    flex: 1,
+    padding: '12px',
+    background: '#334155',
+    borderRadius: '8px',
+    color: 'white',
+    border: 'none',
+    cursor: 'pointer',
+  },
+
+  video: {
+    width: '100%',
+    maxWidth: '500px',
+    borderRadius: '12px',
+  },
+
+  captureBtn: {
+    padding: '12px 25px',
+    borderRadius: '10px',
+    border: 'none',
+    fontWeight: 'bold',
+    background: 'linear-gradient(90deg, #38bdf8, #818cf8)',
+    color: '#000',
+    cursor: 'pointer',
+  },
+
+  previewImg: {
+    width: '200px',
+    borderRadius: '12px',
+  },
+
+  login: {
+    textAlign: 'center',
+    marginTop: '15px',
+  },
+
+  error: {
+    color: '#f87171',
+    textAlign: 'center',
+  },
 };

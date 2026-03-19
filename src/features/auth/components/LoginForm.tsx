@@ -7,28 +7,37 @@ import { AuthActions } from './AuthActions';
 import { useLoginForm } from '../hooks/useAuthForm';
 
 export function LoginForm() {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+
   const { handleLogin, isLoading, error } = useLoginForm();
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!recaptchaToken) {
+      alert('Debes completar el reCAPTCHA');
+      return;
+    }
+
     await handleLogin({
-      email,
+      ...(identifier.includes('@')
+        ? { email: identifier }
+        : { usuario: identifier }),
       password,
-      recaptcha_token: 'test-token-bypass',
+      recaptcha_token: recaptchaToken, // ✅ TOKEN REAL
     });
   }
 
   return (
     <form className="auth-form" onSubmit={handleSubmit}>
       <Input
-        id="login-email"
-        label="Correo electrónico"
-        type="email"
-        placeholder="Ingresa tu correo"
-        value={email}
-        onChange={(event) => setEmail(event.target.value)}
+        id="login-identifier"
+        label="Correo o usuario"
+        placeholder="Ingresa tu correo o nombre de usuario"
+        value={identifier}
+        onChange={(event) => setIdentifier(event.target.value)}
       />
 
       <Input
@@ -40,11 +49,9 @@ export function LoginForm() {
         onChange={(event) => setPassword(event.target.value)}
       />
 
-      <RecaptchaPlaceholder />
+      <RecaptchaPlaceholder onChange={setRecaptchaToken} />
 
-      {error && (
-        <p className="auth-form__message">{error}</p>
-      )}
+      {error && <p className="auth-form__message">{error}</p>}
 
       <Button type="submit" fullWidth disabled={isLoading}>
         {isLoading ? 'Iniciando sesión...' : 'Iniciar sesión'}
