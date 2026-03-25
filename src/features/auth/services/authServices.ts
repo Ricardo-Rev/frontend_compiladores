@@ -94,3 +94,12 @@ export async function getAvatares(): Promise<{ avatares: AvatarDto[], total: num
   const response = await api.get('/api/Avatar');
   return response.data;
 }
+export async function verifyEmail(token: string): Promise<{ mensaje: string }> {
+  const response = await api.get(`/api/EmailVerification/verify?token=${token}`);
+  return response.data;
+}
+
+export async function resendVerification(): Promise<{ mensaje: string }> {
+  const response = await api.post('/api/EmailVerification/resend');
+  return response.data;
+}
