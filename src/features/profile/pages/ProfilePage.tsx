@@ -207,8 +207,8 @@ export function ProfilePage() {
             <h3 style={{ ...styles.infoPanelTitle, marginTop: '2rem' }}>Estado de verificación</h3>
             <div style={styles.verifyGrid}>
               {[
-                { label: 'Correo electrónico', verified: (user as any)?.email_confirmado ?? false },
-                { label: 'Teléfono',           verified: (user as any)?.telefono_confirmado ?? false },
+                { label: 'Correo electrónico', verified: (user as { email_confirmado?: boolean })?.email_confirmado ?? false },
+                { label: 'Teléfono',           verified: (user as { telefono_confirmado?: boolean })?.telefono_confirmado ?? false },
               ].map((item) => (
                 <div key={item.label} style={styles.verifyRow}>
                   <span style={styles.verifyLabel}>{item.label}</span>
@@ -219,7 +219,7 @@ export function ProfilePage() {
               ))}
               </div>
 
-              {!(user as any)?.email_confirmado && (
+              {!(user as { email_confirmado?: boolean })?.email_confirmado && (
                 <button
                   onClick={async () => {
                     try {
