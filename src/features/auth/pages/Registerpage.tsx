@@ -5,7 +5,7 @@ import { RegisterForm } from '../components/RegisterForm';
 export function RegisterPage() {
   return (
     <AuthLayout>
-      <AuthCard title="Crear cuenta" subtitle="Regístrate para acceder a la plataforma.">
+      <AuthCard title="🎮 Crear perfil" subtitle="Regístrate para acceder a la plataforma.">
         <RegisterForm />
       </AuthCard>
     </AuthLayout>
