@@ -11,7 +11,7 @@ export function AuthCard({ title, subtitle, children }: AuthCardProps) {
   return (
     <Panel>
       <div className="auth-card">
-        <div className="auth-card__brand">UMG ++</div>
+        <div className="auth-card__brand"></div>
         <h1 className="auth-card__title">{title}</h1>
         <p className="auth-card__subtitle">{subtitle}</p>
         {children}

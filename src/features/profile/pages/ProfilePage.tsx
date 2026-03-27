@@ -207,8 +207,8 @@ export function ProfilePage() {
             <h3 style={{ ...styles.infoPanelTitle, marginTop: '2rem' }}>Estado de verificación</h3>
             <div style={styles.verifyGrid}>
               {[
-                { label: 'Correo electrónico', verified: false },
-                { label: 'Teléfono',           verified: false },
+                { label: 'Correo electrónico', verified: (user as { email_confirmado?: boolean })?.email_confirmado ?? false },
+                { label: 'Teléfono',           verified: (user as { telefono_confirmado?: boolean })?.telefono_confirmado ?? false },
               ].map((item) => (
                 <div key={item.label} style={styles.verifyRow}>
                   <span style={styles.verifyLabel}>{item.label}</span>
@@ -217,9 +217,26 @@ export function ProfilePage() {
                   </span>
                 </div>
               ))}
-            </div>
+              </div>
 
-            <h3 style={{ ...styles.infoPanelTitle, marginTop: '2rem' }}>Preferencias del editor</h3>
+              {!(user as { email_confirmado?: boolean })?.email_confirmado && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const { resendVerification } = await import('../../auth/services/authServices');
+                      await resendVerification();
+                      toast.success('Email de verificación reenviado.');
+                    } catch {
+                      toast.error('Error al reenviar el email.');
+                    }
+                  }}
+                  style={{ marginTop: '0.75rem', background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.3)', color: '#06B6D4', borderRadius: '8px', padding: '0.6rem 1rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', width: '100%' }}
+                >
+                  Reenviar email de verificación
+                </button>
+              )}
+
+              <h3 style={{ ...styles.infoPanelTitle, marginTop: '2rem' }}>Preferencias del editor</h3>
             <div style={styles.prefsGrid}>
               {[
                 { label: 'Tema',                 value: 'Dark' },

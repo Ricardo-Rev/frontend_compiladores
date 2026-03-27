@@ -2,10 +2,14 @@ name: Frontend CI
 
 on:
   push:
-    branches: [develop, main]
-
+    branches:
+      - main
+      - develop
+      - "feature/*"
   pull_request:
-    branches: [develop, main]
+    branches:
+      - develop
+      - main
 
 jobs:
   build:
@@ -14,19 +18,19 @@ jobs:
 
     steps:
 
-      - name: Descargar repositorio
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Instalar Node
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Instalar dependencias
+      - name: Install dependencies
         run: npm install
 
-      - name: Verificar ESLint
+      - name: Run ESLint
         run: npm run lint
 
-      - name: Compilar proyecto
+      - name: Build project
         run: npm run build

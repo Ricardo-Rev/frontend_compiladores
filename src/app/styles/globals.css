@@ -91,12 +91,59 @@ a:hover {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(56, 189, 248, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(56, 189, 248, 0.06) 1px, transparent 1px);
-  background-size: 48px 48px;
-  opacity: 0.25;
-  pointer-events: none;
+    linear-gradient(rgba(56, 189, 248, 0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.18) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.7;
+  animation: gridMove 8s linear infinite;
 }
+
+.auth-shell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(56,189,248,0.25) 1.5px, transparent 1.5px);
+  background-size: 60px 60px;
+  opacity: 0.25;
+  animation: particles 20s linear infinite;
+}
+@keyframes gridMove {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(40px);
+  }
+}
+
+@keyframes particles {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(80px);
+  }
+}
+
+@keyframes gridMove {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(40px);
+  }
+}
+
+@keyframes particles {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(80px);
+  }
+}
+
+
 
 .auth-shell__content {
   position: relative;
@@ -196,8 +243,14 @@ a:hover {
 .ui-button--primary {
   background: linear-gradient(90deg, var(--accent), var(--accent2));
   color: #031018;
-  box-shadow: var(--glow-purple);
+  box-shadow: 0 0 25px rgba(56,189,248,0.5);
 }
+
+.ui-button--primary:hover {
+  transform: scale(1.03);
+  box-shadow: 0 0 35px rgba(56,189,248,0.7);
+}
+
 
 .ui-button--secondary {
   background: rgba(56, 189, 248, 0.08);

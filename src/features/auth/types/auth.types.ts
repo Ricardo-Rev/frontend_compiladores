@@ -13,6 +13,7 @@ export interface RegisterRequest {
   telefono: string;
   recaptcha_token: string;
   avatar_base64?: string;
+  foto_facial_base64?: string;  // ← agregar esto
 }
 
 export interface QrLoginRequest {
@@ -66,4 +67,9 @@ export interface AuthResponse {
   access_token: string;
   expires_in_seconds: number;
   user: UserDto;
+}
+export interface AvatarDto {
+  id: number;
+  nombre: string;
+  svg: string;
 }
