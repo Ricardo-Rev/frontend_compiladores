@@ -5,7 +5,7 @@ import { LoginForm } from '../components/LoginForm';
 export function LoginPage() {
   return (
     <AuthLayout>
-      <AuthCard title="Acceso seguro" subtitle="Ingresa tus credenciales para continuar.">
+      <AuthCard title="Bienvenido a UMG ++" subtitle="Inicia sesión para comenzar la misión">
         <LoginForm />
       </AuthCard>
     </AuthLayout>
