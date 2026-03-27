@@ -8,6 +8,7 @@ import { DashboardPage } from '../../features/dashboard/pages/DashboardPage';
 import { EditorPage } from '../../features/editor/pages/EditorPage';
 import { useAuth } from '../../features/auth/context/AuthContext';
 import { VerifyEmailPage } from '../../features/auth/pages/VerifyEmailPage';
+import { VerifyCredentialPage } from '../../features/credential/pages/VerifyCredentialPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -36,6 +37,7 @@ export function AppRouter() {
       <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/profile"   element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       <Route path="/editor"    element={<ProtectedRoute><EditorPage /></ProtectedRoute>} />
+      <Route path="/verify-credential" element={<VerifyCredentialPage />} />
     </Routes>
   );
 }

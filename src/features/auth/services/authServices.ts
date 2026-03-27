@@ -103,3 +103,23 @@ export async function resendVerification(): Promise<{ mensaje: string }> {
   const response = await api.post('/api/EmailVerification/resend');
   return response.data;
 }
+
+export async function resendCredential(): Promise<{ credencial_id: number; estado_envio: string; email_enviado: boolean; whatsapp_enviado: boolean }> {
+  const response = await api.post('/api/Credential/resend');
+  return response.data;
+}
+export async function verifyCredential(pdf: File): Promise<{
+  valido: boolean;
+  mensaje: string;
+  algoritmo: string;
+  fecha_firma: string | null;
+}> {
+  const form = new FormData();
+  form.append('pdf', pdf);
+  const response = await api.post('/api/Credential/verify', form, {
+    headers: {
+      'Content-Type': undefined,
+    },
+  });
+  return response.data;
+}
