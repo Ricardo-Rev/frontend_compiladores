@@ -136,8 +136,13 @@ export function RegisterForm() {
       telefono,
       recaptcha_token: recaptchaToken,
 
-      // 🔥 SOLO ESTO SE ENVÍA (como antes)
-      avatar_base64: avatarBase64 ?? undefined,
+      // SVG del muñeco elegido → va como avatar
+      avatar_base64: avatarSeleccionado
+        ? `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(avatarSeleccionado.svg)))}`
+        : undefined,
+
+      // Foto real de cámara/subida → va como foto facial para login facial y PDF
+      foto_facial_base64: avatarBase64 ?? undefined,
     };
 
     console.log("📤 DATA:", payload);

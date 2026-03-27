@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, NavLink } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '../../auth/context/AuthContext';
-import { getMe, logoutUser } from '../../auth/services/authServices';
+import { getMe, logoutUser, resendCredential } from '../../auth/services/authServices';
 import type { UserDto } from '../../auth/types/auth.types';
 
 const IconGrid = () => (
@@ -57,6 +57,7 @@ export function DashboardPage() {
   const [user, setUser] = useState<UserDto | null>(cachedUser);
   const [isLoading, setIsLoading] = useState(!cachedUser);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [resendingCredential, setResendingCredential] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -73,6 +74,22 @@ export function DashboardPage() {
       navigate('/login');
     }
   };
+
+  const handleResendCredential = async () => {
+  setResendingCredential(true);
+  try {
+    const result = await resendCredential();
+    if (result.email_enviado || result.whatsapp_enviado) {
+      toast.success('✅ Credencial reenviada correctamente a tu correo y WhatsApp.');
+    } else {
+      toast.warning('⚠️ Credencial generada pero hubo un problema al enviarla.');
+    }
+  } catch {
+    toast.error('❌ Error al reenviar la credencial. Intenta de nuevo.');
+  } finally {
+    setResendingCredential(false);
+  }
+};
 
   const initials = user?.usuario?.charAt(0).toUpperCase() ?? '?';
   const hora = new Date().getHours();
@@ -183,6 +200,31 @@ export function DashboardPage() {
                   <span style={{ color: 'var(--text-muted)', fontSize: '1.2rem' }}>›</span>
                 </button>
               ))}
+              
+              <button
+                onClick={handleResendCredential}
+                disabled={resendingCredential}
+                style={{
+                  ...styles.actionItem,
+                  opacity: resendingCredential ? 0.6 : 1,
+                  cursor: resendingCredential ? 'not-allowed' : 'pointer',
+                  border: '1px solid rgba(109,40,217,0.3)',
+                  background: 'rgba(109,40,217,0.08)',
+                }}
+              >
+                <div style={{ ...styles.actionIcon, color: '#6D28D9' }}>
+                  <IconShield />
+                </div>
+                <div style={styles.actionText}>
+                  <span style={styles.actionTitle}>
+                    {resendingCredential ? 'Enviando...' : 'Reenviar credencial'}
+                  </span>
+                  <span style={styles.actionDesc}>
+                    Recibe tu PDF firmado electrónicamente
+                  </span>
+                </div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '1.2rem' }}>›</span>
+              </button>
             </div>
           </div>
 

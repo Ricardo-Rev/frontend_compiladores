@@ -311,3 +311,6 @@ a:hover {
   text-align: center;
   padding: 1rem;
 }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
