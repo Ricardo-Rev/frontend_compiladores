@@ -176,8 +176,6 @@ export function RegisterForm() {
       foto_facial_base64: avatarBase64 ?? undefined,
     };
 
-    console.log("📤 DATA:", payload);
-
     await handleRegister(payload);
   }
 

@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import { toast } from 'sonner';
 import { useAuth } from '../../auth/context/AuthContext';
 import { logoutUser } from '../../auth/services/authServices';
 import { compilarCodigo, type LenguajeDestino, type ErrorDto, type TokenDto, type InstruccionDto } from '../services/compilerService';
+import { generarAst, type AstNodoDto } from '../services/astService';
+import { listarCoreografias, obtenerCoreografia, type ChoreoListItem } from '../services/choreoService';
 
 // ── Íconos ──────────────────────────────────────────────────
 const IconGrid = () => (
@@ -67,7 +69,83 @@ const IconList = () => (
     <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
   </svg>
 );
+const IconTree = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M12 3v18M5 9l7-6 7 6M5 15l7-6 7 6"/>
+  </svg>
+);
+const IconMusic = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+  </svg>
+);
+const IconChevronRight = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="9 18 15 12 9 6"/>
+  </svg>
+);
+const IconChevronDown = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="6 9 12 15 18 9"/>
+  </svg>
+);
 
+// ── Colores por tipo de nodo AST ─────────────────────────────
+const NODE_COLORS: Record<string, string> = {
+  PROGRAMA:             'var(--accent)',
+  BLOQUE:               'var(--accent2)',
+  INSTRUCCION:          'var(--accent3)',
+  INSTRUCCION_COMBINADA:'var(--warning)',
+  COMPONENTE:           '#f472b6',
+  PARAMETRO:            'var(--text-muted)',
+};
+
+// ── Nodo recursivo del AST ───────────────────────────────────
+function AstNodo({ nodo, depth = 0 }: { nodo: AstNodoDto; depth?: number }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const color = NODE_COLORS[nodo.tipo] ?? 'var(--text-secondary)';
+  const tieneHijos = nodo.hijos && nodo.hijos.length > 0;
+
+  return (
+    <div style={{ marginLeft: depth === 0 ? 0 : '1.25rem', borderLeft: depth > 0 ? `1px dashed rgba(255,255,255,0.08)` : 'none', paddingLeft: depth > 0 ? '0.75rem' : 0 }}>
+      <div
+        onClick={() => tieneHijos && setCollapsed(c => !c)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '0.4rem',
+          padding: '0.25rem 0.4rem', borderRadius: '6px', cursor: tieneHijos ? 'pointer' : 'default',
+          marginBottom: '0.2rem',
+          background: depth === 0 ? 'rgba(56,189,248,0.07)' : 'transparent',
+          transition: 'background 0.15s',
+        }}
+      >
+        {tieneHijos
+          ? (collapsed ? <IconChevronRight /> : <IconChevronDown />)
+          : <span style={{ width: 12 }} />
+        }
+        <span style={{ color, fontWeight: depth === 0 ? '700' : '600', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}>
+          {nodo.tipo}
+        </span>
+        {nodo.valor && (
+          <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem', fontFamily: 'var(--font-mono)' }}>
+            = <span style={{ color: 'var(--accent3)' }}>{nodo.valor}</span>
+          </span>
+        )}
+        <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: '0.65rem' }}>
+          L{nodo.linea}
+        </span>
+      </div>
+      {!collapsed && tieneHijos && (
+        <div>
+          {nodo.hijos.map((hijo, i) => (
+            <AstNodo key={i} nodo={hijo} depth={depth + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Constantes ───────────────────────────────────────────────
 const CODIGO_EJEMPLO = `PROGRAM mi_ruta
 BEGIN
   avanzar_mts(3);
@@ -76,25 +154,49 @@ BEGIN
 END.
 `;
 
-type OutputTab  = 'consola' | 'tokens' | 'instrucciones' | 'codigo';
+type OutputTab  = 'consola' | 'tokens' | 'instrucciones' | 'codigo' | 'ast';
 type OutputLine = { type: 'info' | 'success' | 'error' | 'warn'; text: string };
 
+// ── Componente principal ─────────────────────────────────────
 export function EditorPage() {
   const { logout, user } = useAuth();
-  const [sidebarOpen, setSidebarOpen]     = useState(true);
-  const [code, setCode]                   = useState(CODIGO_EJEMPLO);
-  const [isCompiling, setIsCompiling]     = useState(false);
-  const [selectedLang, setSelectedLang]   = useState<LenguajeDestino>('python');
-  const [compilaciones, setCompilaciones] = useState(0);
-  const [consolaLines, setConsolaLines]   = useState<OutputLine[]>([]);
-  const [tokens, setTokens]               = useState<TokenDto[]>([]);
-  const [instrucciones, setInstrucciones] = useState<InstruccionDto[]>([]);
-  const [codigoTranspilado, setCodigoTranspilado] = useState('');
-  const [activeTab, setActiveTab]         = useState<OutputTab>('consola');
-  const [lastTiempoMs, setLastTiempoMs]   = useState<number | null>(null);
   const navigate = useNavigate();
 
+  const [sidebarOpen, setSidebarOpen]         = useState(true);
+  const [code, setCode]                       = useState(CODIGO_EJEMPLO);
+  const [isCompiling, setIsCompiling]         = useState(false);
+  const [selectedLang, setSelectedLang]       = useState<LenguajeDestino>('python');
+  const [compilaciones, setCompilaciones]     = useState(0);
+  const [consolaLines, setConsolaLines]       = useState<OutputLine[]>([]);
+  const [tokens, setTokens]                   = useState<TokenDto[]>([]);
+  const [instrucciones, setInstrucciones]     = useState<InstruccionDto[]>([]);
+  const [codigoTranspilado, setCodigoTranspilado] = useState('');
+  const [activeTab, setActiveTab]             = useState<OutputTab>('consola');
+  const [lastTiempoMs, setLastTiempoMs]       = useState<number | null>(null);
+
+  // AST
+  const [astData, setAstData]       = useState<AstNodoDto | null>(null);
+  const [isLoadingAst, setIsLoadingAst] = useState(false);
+
+  // Coreografías
+  const [choreoOpen, setChoreoOpen]       = useState(false);
+  const [choreoList, setChoreoList]       = useState<ChoreoListItem[]>([]);
+  const [choreoLoading, setChoreoLoading] = useState(false);
+  const [choreoLoadingId, setChoreoLoadingId] = useState<number | null>(null);
+  const choreoRef = useRef<HTMLDivElement>(null);
+
   const initials = user?.usuario?.charAt(0).toUpperCase() ?? '?';
+
+  // Cerrar dropdown coreografías al hacer click fuera
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (choreoRef.current && !choreoRef.current.contains(e.target as Node)) {
+        setChoreoOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const handleLogout = async () => {
     try { await logoutUser(); } finally {
@@ -105,10 +207,12 @@ export function EditorPage() {
   const addLine = (type: OutputLine['type'], text: string) =>
     setConsolaLines(prev => [...prev, { type, text }]);
 
+  // ── Compilar ────────────────────────────────────────────────
   const handleCompile = async () => {
     if (!code.trim()) { toast.error('El editor está vacío.'); return; }
     setIsCompiling(true);
     setConsolaLines([]); setTokens([]); setInstrucciones([]); setCodigoTranspilado('');
+    setAstData(null);
     setActiveTab('consola');
     addLine('info', '🔍 Conectando con el compilador UMG++...');
 
@@ -153,8 +257,74 @@ export function EditorPage() {
     }
   };
 
+  // ── Generar AST ─────────────────────────────────────────────
+  const handleGenerarAst = async () => {
+    if (!code.trim()) { toast.error('El editor está vacío.'); return; }
+    setIsLoadingAst(true);
+    setActiveTab('ast');
+    setAstData(null);
+
+    try {
+      const result = await generarAst(code);
+      if (result.exitoso && result.arbol) {
+        setAstData(result.arbol);
+        toast.success(`AST generado — programa: ${result.programa}`);
+      } else {
+        const primer = result.errores[0];
+        toast.error(primer ? `Error ${primer.tipo}: ${primer.mensaje}` : 'No se pudo generar el AST.');
+        setActiveTab('consola');
+        if (primer) {
+          addLine('error', `[AST] ${primer.tipo.toUpperCase()} L${primer.linea ?? '?'}: ${primer.mensaje}`);
+          if (primer.sugerencia) addLine('warn', `  💡 ${primer.sugerencia}`);
+        }
+      }
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string }; status?: number } };
+      if (axiosErr.response?.status === 401) { logout(); navigate('/login'); }
+      toast.error('Error al generar el AST.');
+      setActiveTab('consola');
+    } finally {
+      setIsLoadingAst(false);
+    }
+  };
+
+  // ── Coreografías ────────────────────────────────────────────
+  const handleAbrirChoreo = async () => {
+    setChoreoOpen(prev => !prev);
+    if (choreoList.length === 0) {
+      setChoreoLoading(true);
+      try {
+        const lista = await listarCoreografias();
+        setChoreoList(lista);
+      } catch {
+        toast.error('No se pudieron cargar las coreografías.');
+      } finally {
+        setChoreoLoading(false);
+      }
+    }
+  };
+
+  const handleCargarChoreo = async (id: number, nombre: string) => {
+    setChoreoLoadingId(id);
+    try {
+      const detalle = await obtenerCoreografia(id);
+      setCode(detalle.codigo_fuente);
+      setChoreoOpen(false);
+      setConsolaLines([]); setTokens([]); setInstrucciones([]); setCodigoTranspilado(''); setAstData(null);
+      setActiveTab('consola');
+      addLine('info', `🎵 Coreografía cargada: ${nombre}`);
+      if (detalle.cancion_nombre) addLine('info', `🎶 Canción: ${detalle.cancion_nombre}`);
+      toast.success(`Coreografía "${nombre}" cargada en el editor`);
+    } catch {
+      toast.error('Error al cargar la coreografía.');
+    } finally {
+      setChoreoLoadingId(null);
+    }
+  };
+
+  // ── Helpers ─────────────────────────────────────────────────
   const handleClear = () => {
-    setCode(''); setConsolaLines([]); setTokens([]); setInstrucciones([]); setCodigoTranspilado('');
+    setCode(''); setConsolaLines([]); setTokens([]); setInstrucciones([]); setCodigoTranspilado(''); setAstData(null);
   };
 
   const handleDownload = () => {
@@ -184,11 +354,18 @@ export function EditorPage() {
     return 'var(--text-secondary)';
   };
 
+  const formatDuracion = (seg: number) => {
+    const m = Math.floor(seg / 60);
+    const s = seg % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  };
+
   const tabs: { id: OutputTab; label: string; count?: number }[] = [
     { id: 'consola',       label: 'Consola',      count: consolaLines.length },
     { id: 'tokens',        label: 'Tokens',        count: tokens.length },
     { id: 'instrucciones', label: 'Instrucciones', count: instrucciones.length },
     { id: 'codigo',        label: selectedLang === 'python' ? 'Python' : 'C#' },
+    { id: 'ast',           label: 'AST' },
   ];
 
   return (
@@ -240,6 +417,47 @@ export function EditorPage() {
             <h1 style={styles.topbarTitle}>Editor de Código</h1>
           </div>
           <div style={styles.topbarRight}>
+            {/* Dropdown coreografías */}
+            <div ref={choreoRef} style={{ position: 'relative' }}>
+              <button onClick={handleAbrirChoreo} style={styles.btnChoreo}>
+                <IconMusic />
+                Coreografías
+              </button>
+              {choreoOpen && (
+                <div style={styles.choreoDropdown}>
+                  <div style={styles.choreoDropdownHeader}>🎵 Coreografías pregrabadas</div>
+                  {choreoLoading ? (
+                    <div style={styles.choreoLoading}>Cargando...</div>
+                  ) : choreoList.length === 0 ? (
+                    <div style={styles.choreoLoading}>Sin coreografías disponibles</div>
+                  ) : (
+                    choreoList.map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => handleCargarChoreo(c.id, c.nombre)}
+                        disabled={choreoLoadingId === c.id}
+                        style={styles.choreoItem}
+                      >
+                        <div style={styles.choreoItemTop}>
+                          <span style={styles.choreoItemNombre}>{c.nombre}</span>
+                          <span style={styles.choreoItemDur}>{formatDuracion(c.duracion_min_seg)}</span>
+                        </div>
+                        {c.descripcion && (
+                          <div style={styles.choreoItemDesc}>{c.descripcion}</div>
+                        )}
+                        {c.cancion_nombre && (
+                          <div style={styles.choreoItemCancion}>🎶 {c.cancion_nombre}</div>
+                        )}
+                        {choreoLoadingId === c.id && (
+                          <div style={styles.choreoItemLoading}>Cargando código...</div>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
             <select value={selectedLang} onChange={e => setSelectedLang(e.target.value as LenguajeDestino)} style={styles.langSelect}>
               <option value="python">Python</option>
               <option value="csharp">C#</option>
@@ -250,8 +468,19 @@ export function EditorPage() {
                 <IconDownload /> .{selectedLang === 'python' ? 'py' : 'cs'}
               </button>
             )}
+            <button
+              onClick={handleGenerarAst}
+              disabled={isLoadingAst}
+              style={{ ...styles.btnAst, opacity: isLoadingAst ? 0.7 : 1, cursor: isLoadingAst ? 'not-allowed' : 'pointer' }}
+            >
+              <IconTree />{isLoadingAst ? 'Generando...' : 'Ver AST'}
+            </button>
             <button onClick={handleClear} style={styles.btnDanger}><IconTrash /> Limpiar</button>
-            <button onClick={handleCompile} disabled={isCompiling} style={{ ...styles.btnPrimary, opacity: isCompiling ? 0.7 : 1, cursor: isCompiling ? 'not-allowed' : 'pointer' }}>
+            <button
+              onClick={handleCompile}
+              disabled={isCompiling}
+              style={{ ...styles.btnPrimary, opacity: isCompiling ? 0.7 : 1, cursor: isCompiling ? 'not-allowed' : 'pointer' }}
+            >
               <IconPlay />{isCompiling ? 'Compilando...' : 'Compilar'}
             </button>
           </div>
@@ -305,11 +534,15 @@ export function EditorPage() {
                   {tab.count !== undefined && tab.count > 0 && (
                     <span style={{ ...styles.tabBadge, background: activeTab === tab.id ? 'var(--accent)' : 'var(--bg-elevated)', color: activeTab === tab.id ? '#000' : 'var(--text-muted)' }}>{tab.count}</span>
                   )}
+                  {tab.id === 'ast' && astData && (
+                    <span style={{ ...styles.tabBadge, background: activeTab === 'ast' ? 'var(--accent)' : 'rgba(56,189,248,0.15)', color: activeTab === 'ast' ? '#000' : 'var(--accent)' }}>✓</span>
+                  )}
                 </button>
               ))}
             </div>
 
             <div style={styles.outputContent}>
+              {/* CONSOLA */}
               {activeTab === 'consola' && (
                 consolaLines.length === 0
                   ? <div style={styles.outputEmpty}><IconZap /><p>Presiona <strong style={{ color: 'var(--accent)' }}>Compilar</strong> para ver los resultados</p></div>
@@ -321,6 +554,7 @@ export function EditorPage() {
                     ))
               )}
 
+              {/* TOKENS */}
               {activeTab === 'tokens' && (
                 tokens.length === 0
                   ? <div style={styles.outputEmpty}><IconList /><p>Sin tokens — compila primero</p></div>
@@ -339,6 +573,7 @@ export function EditorPage() {
                     </table>
               )}
 
+              {/* INSTRUCCIONES */}
               {activeTab === 'instrucciones' && (
                 instrucciones.length === 0
                   ? <div style={styles.outputEmpty}><IconList /><p>Sin instrucciones — compila primero</p></div>
@@ -359,10 +594,34 @@ export function EditorPage() {
                     </table>
               )}
 
+              {/* CÓDIGO TRANSPILADO */}
               {activeTab === 'codigo' && (
                 !codigoTranspilado
                   ? <div style={styles.outputEmpty}><IconCode /><p>Sin código generado — compila primero</p></div>
                   : <pre style={styles.codeBlock}>{codigoTranspilado}</pre>
+              )}
+
+              {/* AST */}
+              {activeTab === 'ast' && (
+                isLoadingAst
+                  ? <div style={styles.outputEmpty}><IconTree /><p style={{ color: 'var(--accent)' }}>Generando árbol sintáctico...</p></div>
+                  : !astData
+                    ? <div style={styles.outputEmpty}>
+                        <IconTree />
+                        <p>Presiona <strong style={{ color: 'var(--accent)' }}>Ver AST</strong> para generar el árbol sintáctico</p>
+                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '-0.5rem' }}>No requiere compilar primero</p>
+                      </div>
+                    : <div>
+                        <div style={styles.astLeyenda}>
+                          {Object.entries(NODE_COLORS).map(([tipo, color]) => (
+                            <span key={tipo} style={styles.astLeyendaItem}>
+                              <span style={{ ...styles.astLeyendaDot, background: color }} />
+                              <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>{tipo}</span>
+                            </span>
+                          ))}
+                        </div>
+                        <AstNodo nodo={astData} depth={0} />
+                      </div>
               )}
             </div>
           </div>
@@ -400,9 +659,21 @@ const styles: Record<string, React.CSSProperties> = {
   topbarTitle: { color: 'var(--text-primary)', fontSize: '1.5rem', fontWeight: '700', margin: '0.2rem 0 0', fontFamily: 'var(--font-brand)', letterSpacing: '1px' },
   topbarRight: { display: 'flex', alignItems: 'center', gap: '0.65rem' },
   langSelect: { background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: '8px', padding: '0.5rem 0.75rem', fontSize: '0.825rem', cursor: 'pointer', fontFamily: 'var(--font-mono)' },
-  btnPrimary: { display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--accent)', color: '#000', border: 'none', borderRadius: '8px', padding: '0.55rem 1.1rem', fontWeight: '700', fontSize: '0.85rem' },
+  btnPrimary: { display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--accent)', color: '#000', border: 'none', borderRadius: '8px', padding: '0.55rem 1.1rem', fontWeight: '700', fontSize: '0.85rem', cursor: 'pointer' },
   btnSecondary: { display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '0.55rem 0.9rem', fontSize: '0.825rem', cursor: 'pointer' },
   btnDanger: { display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--danger)', borderRadius: '8px', padding: '0.55rem 0.9rem', fontSize: '0.825rem', cursor: 'pointer' },
+  btnAst: { display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.3)', color: 'var(--accent2)', borderRadius: '8px', padding: '0.55rem 0.9rem', fontSize: '0.825rem', fontWeight: '600' },
+  btnChoreo: { display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(244,114,182,0.1)', border: '1px solid rgba(244,114,182,0.3)', color: '#f472b6', borderRadius: '8px', padding: '0.55rem 0.9rem', fontSize: '0.825rem', cursor: 'pointer', fontWeight: '600' },
+  choreoDropdown: { position: 'absolute', top: 'calc(100% + 6px)', right: 0, width: '280px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', zIndex: 100, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' },
+  choreoDropdownHeader: { padding: '0.65rem 0.9rem', fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', background: 'var(--bg-elevated)' },
+  choreoLoading: { padding: '1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' },
+  choreoItem: { width: '100%', textAlign: 'left', background: 'none', border: 'none', borderBottom: '1px solid var(--border)', padding: '0.65rem 0.9rem', cursor: 'pointer', transition: 'background 0.15s', display: 'block' },
+  choreoItemTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' },
+  choreoItemNombre: { color: 'var(--text-primary)', fontSize: '0.82rem', fontWeight: '600' },
+  choreoItemDur: { color: 'var(--text-muted)', fontSize: '0.7rem', fontFamily: 'var(--font-mono)' },
+  choreoItemDesc: { color: 'var(--text-muted)', fontSize: '0.72rem', marginBottom: '0.15rem' },
+  choreoItemCancion: { color: '#f472b6', fontSize: '0.7rem' },
+  choreoItemLoading: { color: 'var(--accent)', fontSize: '0.7rem', marginTop: '0.25rem' },
   statsRow: { display: 'flex', gap: '0.75rem', flexShrink: 0 },
   statChip: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.5rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.1rem' },
   statChipLabel: { color: 'var(--text-muted)', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.5px' },
@@ -426,4 +697,7 @@ const styles: Record<string, React.CSSProperties> = {
   th: { color: 'var(--text-muted)', textAlign: 'left', padding: '0.4rem 0.5rem', borderBottom: '1px solid var(--border)', fontWeight: '600', textTransform: 'uppercase', fontSize: '0.65rem', letterSpacing: '0.5px' },
   td: { color: 'var(--text-secondary)', padding: '0.35rem 0.5rem', borderBottom: '1px solid rgba(255,255,255,0.03)' },
   codeBlock: { margin: 0, color: 'var(--accent3)', lineHeight: '1.7', whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
+  astLeyenda: { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem', padding: '0.5rem 0.4rem', borderBottom: '1px solid var(--border)' },
+  astLeyendaItem: { display: 'flex', alignItems: 'center', gap: '0.3rem' },
+  astLeyendaDot: { width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0 },
 };
