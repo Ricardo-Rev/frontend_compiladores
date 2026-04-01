@@ -7,6 +7,7 @@ import { RecaptchaPlaceholder } from './RecaptchaPlaceholder';
 import { useRegisterForm } from '../hooks/useAuthForm';
 import { segmentFace, getAvatares } from '../services/authServices';
 import type { AvatarDto } from '../types/auth.types';
+import { toast } from "sonner";
 
 type FotoMode = 'none' | 'camera' | 'preview';
 type Step = 1 | 2 | 3;
@@ -124,7 +125,9 @@ export function RegisterForm() {
     }
 
     if (!recaptchaToken) {
-      setLocalError('Completa el reCAPTCHA');
+      toast.error("⚠️ Debes completar el reCAPTCHA 🤖", {
+        description: "Verifica que no eres un robot antes de continuar",
+      });
       return;
     }
 
