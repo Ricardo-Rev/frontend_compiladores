@@ -39,7 +39,6 @@ export function RecaptchaPlaceholder({ onChange }: Props) {
         ref={recaptchaRef}
         sitekey="6LdofoUsAAAAABqxUKNqOJuRKxhAtP_2OfENLcJ6"
         onChange={(token) => {
-          console.log("TOKEN CAPTCHA:", token);
           onChange(token);
         }}
       />

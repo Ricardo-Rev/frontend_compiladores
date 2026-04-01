@@ -6,6 +6,7 @@ import { Input } from '../../../shared/components/ui/Input';
 import { RecaptchaPlaceholder } from './RecaptchaPlaceholder';
 import { AuthActions } from './AuthActions';
 import { useLoginForm } from '../hooks/useAuthForm';
+import { toast } from "sonner";
 
 export function LoginForm() {
   const [identifier, setIdentifier] = useState('');
@@ -19,7 +20,9 @@ export function LoginForm() {
     event.preventDefault();
 
     if (!recaptchaToken) {
-      alert('Debes completar el reCAPTCHA');
+      toast.error("⚠️ Debes completar el reCAPTCHA 🤖", {
+        description: "Verifica que no eres un robot antes de continuar",
+      });
       return;
     }
 
