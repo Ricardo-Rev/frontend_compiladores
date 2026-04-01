@@ -23,6 +23,7 @@ export function RegisterForm() {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [passwordStrength, setPasswordStrength] = useState('');
 
@@ -47,6 +48,7 @@ export function RegisterForm() {
   }, []);
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const passwordsMatch =confirmPassword.length === 0 ? null : password === confirmPassword;
 
   function getPasswordStrength(password: string) {
     let strength = 0;
@@ -62,22 +64,26 @@ export function RegisterForm() {
 
   const abrirCamara = async () => {
     try {
+      cerrarCamara();
       setCameraError(null);
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user' },
+      });
+
       streamRef.current = stream;
       setFotoMode('camera');
 
       setTimeout(() => {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.play();
+          videoRef.current.play().catch(() => {});
         }
       }, 300);
     } catch {
       setCameraError('No se pudo acceder a la cámara');
     }
   };
-
   const cerrarCamara = () => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
   };
@@ -89,6 +95,11 @@ export function RegisterForm() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
+
+    if (!video.videoWidth || !video.videoHeight) {
+      setCameraError('La cámara aún no está lista. Intenta de nuevo.');
+      return;
+    }
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -109,6 +120,23 @@ export function RegisterForm() {
 
     setFotoMode('preview');
     cerrarCamara();
+  };
+
+  const volverATomarFoto = async () => {
+    setAvatarBase64(null);
+    setCameraError(null);
+    await abrirCamara();
+  };
+
+  const quitarFoto = () => {
+    cerrarCamara();
+    setAvatarBase64(null);
+    setCameraError(null);
+    setFotoMode('none');
+
+    if (fileRef.current) {
+      fileRef.current.value = '';
+    }
   };
 
   async function handleSubmit(e: React.FormEvent) {
@@ -177,7 +205,7 @@ export function RegisterForm() {
                 onChange={(e) => {
                   const val = e.target.value;
                   setEmail(val);
-                  setEmailError(emailRegex.test(val) ? '' : 'Correo inválido');
+                  setEmailError(val.length > 0 && !emailRegex.test(val) ? 'Correo inválido' : '');
                 }}
               />
               {emailError && <div style={s.inputErrorOverlay} />}
@@ -194,10 +222,11 @@ export function RegisterForm() {
                   const val = e.target.value;
                   setPassword(val);
                   setPasswordStrength(getPasswordStrength(val));
+                  setLocalError(null);
                 }}
               />
               <span onClick={() => setShowPassword(!showPassword)} style={s.eyeInside}>
-                {showPassword ? <FaEyeSlash /> : <FaEye />}
+                {showPassword ? <FaEye /> : <FaEyeSlash />}
               </span>
 
               <div style={s.strengthBarContainer}>
@@ -221,17 +250,71 @@ export function RegisterForm() {
               </div>
             </div>
 
-            <Input
-              label="Confirmar"
-              type={showPassword ? 'text' : 'password'}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-            />
+            <div style={s.inputWrapper}>
+              <Input
+                label="Confirmar"
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                  setLocalError(null);
+                }}
+              />
+
+              <span
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                style={s.eyeInside}
+              >
+                {showConfirmPassword ? <FaEye /> : <FaEyeSlash />}
+              </span>
+
+              {confirmPassword && (
+                <small
+                  style={{
+                    marginTop: '6px',
+                    fontSize: '12px',
+                    color: passwordsMatch ? '#22c55e' : '#ef4444',
+                    fontWeight: 500,
+                  }}
+                >
+                  {passwordsMatch
+                    ? 'Las contraseñas coinciden'
+                    : 'Las contraseñas no coinciden'}
+                </small>
+              )}
+            </div>
 
             <div style={{ gridColumn: 'span 2' }}>
-              <Button type="button" onClick={() => setStep(2)}>
-                Siguiente →
-              </Button>
+              <Button
+              type="button"
+              onClick={() => {
+                setLocalError(null);
+
+                if (!nombreCompleto || !usuario || !email || !telefono || !password || !confirmPassword) {
+                  setLocalError('Completa todos los campos antes de continuar');
+                  return;
+                }
+
+                if (!emailRegex.test(email)) {
+                  setLocalError('Correo inválido');
+                  return;
+                }
+
+                if (password !== confirmPassword) {
+                  setLocalError('Las contraseñas no coinciden');
+                  return;
+                }
+
+                setStep(2);
+              }}
+            >
+              Siguiente →
+            </Button>
+            {localError && (
+              <p style={{ ...s.error, gridColumn: 'span 2' }}>
+                {localError}
+              </p>
+            )}
             </div>
           </div>
         )}
@@ -268,19 +351,44 @@ export function RegisterForm() {
 
             {fotoMode === 'camera' && (
               <div style={s.cameraBox}>
-                <video ref={videoRef} style={s.video} autoPlay />
+                <video ref={videoRef} style={s.video} autoPlay playsInline muted />
                 <canvas ref={canvasRef} style={{ display: 'none' }} />
-                <button type="button" onClick={capturarFoto} style={s.captureBtn}>
-                  📸 Capturar foto
-                </button>
+
+                <div style={s.photoActions}>
+                  <button type="button" onClick={capturarFoto} style={s.captureBtn}>
+                    📸 Capturar foto
+                  </button>
+
+                  <button type="button" onClick={quitarFoto} style={s.secondaryBtn}>
+                    Cancelar
+                  </button>
+                </div>
               </div>
             )}
 
             {fotoMode === 'preview' && avatarBase64 && (
-              <div style={s.cameraBox}>
-                <img src={avatarBase64} style={s.previewImg} />
+            <div style={s.cameraBox}>
+              <img src={avatarBase64} style={s.previewImg} alt="Vista previa" />
+
+              <div style={s.photoActions}>
+                <button type="button" onClick={volverATomarFoto} style={s.captureBtn}>
+                  🔄 Volver a tomar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  style={s.secondaryBtn}
+                >
+                  🖼 Cambiar imagen
+                </button>
+
+                <button type="button" onClick={quitarFoto} style={s.dangerBtn}>
+                  ❌ Quitar foto
+                </button>
               </div>
-            )}
+            </div>
+          )}
 
             {cameraError && <p style={s.error}>{cameraError}</p>}
 
@@ -358,10 +466,47 @@ const s: Record<string, React.CSSProperties> = {
   avatarItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '10px', borderRadius: '10px', background: '#334155', cursor: 'pointer' },
 
   inputWrapper: { position: 'relative', display: 'flex', flexDirection: 'column' },
-  eyeInside: { position: 'absolute', right: '10px', top: '60%', transform: 'translateY(-50%)', cursor: 'pointer', padding: '6px', color: '#94a3b8' },
-
+  
+  eyeInside: {
+    position: 'absolute',
+    right: '10px',
+    top: '60%',
+    transform: 'translateY(-50%)',
+    cursor: 'pointer',
+    padding: '6px',
+    color: '#94a3b8'
+  },
   strengthBarContainer: { width: '100%', height: '6px', background: '#334155', borderRadius: '4px', marginTop: '6px', overflow: 'hidden' },
   strengthBar: { height: '100%', transition: 'all 0.3s ease', borderRadius: '4px' },
 
-  inputErrorOverlay: { position: 'absolute', top: '32px', left: 0, right: 0, bottom: 0, borderRadius: '10px', border: '2px solid #ef4444' },
+  inputErrorOverlay: {
+    position: 'absolute',
+    top: '32px',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: '10px',
+    border: '2px solid #ef4444',
+    pointerEvents: 'none',
+  },
+
+secondaryBtn: {
+  padding: '12px 20px',
+  borderRadius: '10px',
+  border: '1px solid #475569',
+  background: '#334155',
+  color: '#fff',
+  cursor: 'pointer',
+  fontWeight: 600,
+},
+
+dangerBtn: {
+  padding: '12px 20px',
+  borderRadius: '10px',
+  border: '1px solid #7f1d1d',
+  background: '#7f1d1d',
+  color: '#fff',
+  cursor: 'pointer',
+  fontWeight: 600,
+},
 };
