@@ -74,7 +74,7 @@ export function LoginForm() {
             transition: 'all 0.2s ease',  
           }}
         >
-          {showPassword ? <FaEyeSlash /> : <FaEye />}
+          {showPassword ? <FaEye /> : <FaEyeSlash />}
         </button>
       </div>
 
