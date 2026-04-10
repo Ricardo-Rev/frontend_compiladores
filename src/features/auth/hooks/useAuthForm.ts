@@ -30,7 +30,7 @@ export function useLoginForm() {
       const response = await loginUser(data);
       login(response.access_token, response.user);
       toast.success(`¡Bienvenido, ${response.user.usuario}! 👋`);
-      navigate('/dashboard');
+      navigate(response.user.rol === 'administrador' ? '/admin' : '/dashboard'); // Redirigir según el rol
     } catch (err: unknown) {
       const msg = getErrorMessage(err, 'Error al iniciar sesión.');
       setError(msg);
@@ -48,7 +48,7 @@ export function useLoginForm() {
       const response = await loginWithQr({ codigo_qr: codigo });
       login(response.access_token, response.user);
       toast.success(`¡Bienvenido, ${response.user.usuario}! 📱`);
-      navigate('/dashboard');
+      navigate(response.user.rol === 'administrador' ? '/admin' : '/dashboard'); // Redirigir según el rol
     } catch (err: unknown) {
       const msg = getErrorMessage(err, 'QR inválido.');
       setError(msg);
@@ -66,7 +66,7 @@ export function useLoginForm() {
       const response = await loginWithFacial({ rostro_base64: base64 });
       login(response.access_token, response.user);
       toast.success(`¡Bienvenido, ${response.user.usuario}! 😎`);
-      navigate('/dashboard');
+      navigate(response.user.rol === 'administrador' ? '/admin' : '/dashboard'); // Redirigir según el rol
     } catch (err: unknown) {
       const msg = getErrorMessage(err, 'No se pudo reconocer el rostro.');
       setError(msg);
