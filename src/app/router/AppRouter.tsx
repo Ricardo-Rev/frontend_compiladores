@@ -11,9 +11,10 @@ import { useAuth } from '../../features/auth/context/AuthContext';
 import { VerifyEmailPage } from '../../features/auth/pages/VerifyEmailPage';
 import { VerifyCredentialPage } from '../../features/credential/pages/VerifyCredentialPage';
 
-// Ruta protegida para cualquier usuario autenticado
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+// Redirige según el rol del usuario autenticado
+// Si no está autenticado manda al login
+function RootRedirect() {
+  const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -24,11 +25,30 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     </div>
   );
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (user?.rol === 'administrador') return <Navigate to="/admin" replace />;
+  return <Navigate to="/dashboard" replace />;
+}
+
+// Ruta protegida para conductores
+// Si el usuario es admin lo manda a /admin, no lo deja en rutas de conductor
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading, user } = useAuth();
+  if (isLoading) return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      minHeight: '100vh', background: 'var(--bg-deep)', color: 'var(--text-secondary)',
+      fontFamily: 'var(--font-ui)'
+    }}>
+      Cargando...
+    </div>
+  );
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (user?.rol === 'administrador') return <Navigate to="/admin" replace />;
   return <>{children}</>;
 }
 
 // Ruta exclusiva para administradores
-// Si el usuario está autenticado pero NO es admin, lo manda al dashboard
+// Si el usuario NO es admin lo manda al dashboard
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return (
@@ -48,7 +68,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 export function AppRouter() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<RootRedirect />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/login/qr" element={<QrLoginPage />} />
