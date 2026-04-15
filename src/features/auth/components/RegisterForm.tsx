@@ -193,12 +193,13 @@ export function RegisterForm() {
 
         {step === 1 && (
           <div style={s.grid}>
-            <Input label="Nombre" value={nombreCompleto} onChange={(e) => setNombreCompleto(e.target.value)} />
-            <Input label="Usuario" value={usuario} onChange={(e) => setUsuario(e.target.value)} />
+            <Input label="Nombre" placeholder="María García" value={nombreCompleto} onChange={(e) => setNombreCompleto(e.target.value)} />
+            <Input label="Usuario" placeholder="maria_g" value={usuario} onChange={(e) => setUsuario(e.target.value)} />
 
             <div style={{ position: 'relative' }}>
               <Input
                 label="Correo"
+                placeholder="micorreo@gmail.com"
                 value={email}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -209,7 +210,49 @@ export function RegisterForm() {
               {emailError && <div style={s.inputErrorOverlay} />}
             </div>
 
-            <Input label="Teléfono" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+            <div className="ui-field">
+            <label className="ui-field__label">Teléfono</label>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                background: 'rgba(17, 24, 39, 0.7)',
+                border: '1px solid var(--border)',
+                borderRadius: '14px',
+                overflow: 'hidden',
+                transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+              }}
+              onFocusCapture={(e) => {
+                e.currentTarget.style.borderColor = 'var(--accent)';
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(56, 189, 248, 0.15)';
+              }}
+              onBlurCapture={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <span style={{
+                padding: '0 10px',
+                color: 'var(--accent)',
+                fontWeight: 'bold',
+                borderRight: '1px solid var(--border)',
+                whiteSpace: 'nowrap',
+              }}>+502</span>
+              <input
+                className="ui-field__input"
+                style={{
+                  border: 'none',
+                  borderRadius: '0',
+                  flex: 1,
+                  background: 'transparent',
+                  boxShadow: 'none',
+                }}
+                placeholder="55557777"
+                value={telefono}
+                onChange={(e) => setTelefono(e.target.value)}
+              />
+            </div>
+          </div>
 
             <div style={s.inputWrapper}>
               <Input
