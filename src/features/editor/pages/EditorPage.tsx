@@ -26,6 +26,7 @@ import {
   type FileListResponse,
 } from '../services/fileService';
 import { useAutoSave, type SaveStatus } from '../hooks/useAutoSave';
+import { useRoverSignalR } from '../hooks/useRoverSignalR';
 
 // ── Íconos ──────────────────────────────────────────────────
 const IconGrid         = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>);
@@ -76,15 +77,11 @@ function AutoSaveIndicator({ status, lastSavedAt }: { status: SaveStatus; lastSa
 }
 
 // ── Modal Historial ──────────────────────────────────────────
-interface VersionItem extends FileListResponse {
-  contenido?: string;
-}
-
+interface VersionItem extends FileListResponse { contenido?: string; }
 interface ModalHistorialProps {
-  archivoId:     number;
-  archivoNombre: string;
-  onRestaurar:   (contenido: string, version: number) => void;
-  onCerrar:      () => void;
+  archivoId: number; archivoNombre: string;
+  onRestaurar: (contenido: string, version: number) => void;
+  onCerrar: () => void;
 }
 
 function ModalHistorial({ archivoId, archivoNombre, onRestaurar, onCerrar }: ModalHistorialProps) {
@@ -100,11 +97,8 @@ function ModalHistorial({ archivoId, archivoNombre, onRestaurar, onCerrar }: Mod
         const lista = await obtenerHistorial(archivoId);
         setVersiones(lista as VersionItem[]);
         if (lista.length > 0) seleccionarVersion(lista[0] as VersionItem);
-      } catch {
-        toast.error('No se pudo cargar el historial.');
-      } finally {
-        setCargando(false);
-      }
+      } catch { toast.error('No se pudo cargar el historial.'); }
+      finally { setCargando(false); }
     };
     cargar();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -112,235 +106,78 @@ function ModalHistorial({ archivoId, archivoNombre, onRestaurar, onCerrar }: Mod
 
   const seleccionarVersion = async (version: VersionItem) => {
     setSeleccionada(version);
-
-    // Si ya está cacheado en memoria, no volver a pedir
-    if (version.contenido) {
-      setContenidoPreview(version.contenido);
-      return;
-    }
-
+    if (version.contenido) { setContenidoPreview(version.contenido); return; }
     setCargandoPreview(true);
     try {
-      // Llamar al nuevo endpoint que devuelve el contenido real del historial
       const detalle = await obtenerVersionHistorial(archivoId, version.version);
-
-      // Cachear en el array para no repetir el request si el usuario vuelve a seleccionarla
       const updated = { ...version, contenido: detalle.contenido };
       setVersiones(prev => prev.map(v => v.id === version.id ? updated : v));
       setSeleccionada(updated);
       setContenidoPreview(detalle.contenido);
-    } catch {
-      setContenidoPreview(`-- No se pudo cargar el código de la versión ${version.version}`);
-    } finally {
-      setCargandoPreview(false);
-    }
+    } catch { setContenidoPreview(`-- No se pudo cargar el código de la versión ${version.version}`); }
+    finally { setCargandoPreview(false); }
   };
 
   const formatFecha = (iso: string) =>
-    new Date(iso).toLocaleString('es-GT', {
-      day: '2-digit', month: 'short', year: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    });
+    new Date(iso).toLocaleString('es-GT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div
-      onClick={onCerrar}
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 1000, padding: '24px',
-      }}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          width: '100%', maxWidth: '920px', height: '600px',
-          background: 'var(--bg-card)', border: '1px solid var(--border)',
-          borderRadius: '16px', display: 'flex', flexDirection: 'column',
-          overflow: 'hidden',
-        }}
-      >
-        {/* Header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '0.75rem',
-          padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)',
-          background: 'var(--bg-elevated)', flexShrink: 0,
-        }}>
+    <div onClick={onCerrar} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '24px' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '920px', height: '600px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)', background: 'var(--bg-elevated)', flexShrink: 0 }}>
           <IconHistory />
           <div style={{ flex: 1 }}>
-            <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.95rem' }}>
-              Historial de versiones
-            </div>
-            <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', fontFamily: 'var(--font-mono)' }}>
-              {archivoNombre} — solo compilaciones exitosas
-            </div>
+            <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.95rem' }}>Historial de versiones</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', fontFamily: 'var(--font-mono)' }}>{archivoNombre} — solo compilaciones exitosas</div>
           </div>
-          <button
-            onClick={onCerrar}
-            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', borderRadius: '6px', display: 'flex', alignItems: 'center' }}
-          >
-            <IconX />
-          </button>
+          <button onClick={onCerrar} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px', borderRadius: '6px', display: 'flex', alignItems: 'center' }}><IconX /></button>
         </div>
-
-        {/* Body */}
         <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
-
-          {/* Panel izquierdo — lista de versiones */}
-          <div style={{
-            width: '270px', flexShrink: 0, borderRight: '1px solid var(--border)',
-            overflowY: 'auto', display: 'flex', flexDirection: 'column',
-          }}>
+          <div style={{ width: '270px', flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
             {cargando ? (
-              <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                Cargando historial...
-              </div>
+              <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>Cargando historial...</div>
             ) : versiones.length === 0 ? (
               <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                <IconHistory />
-                <p style={{ margin: 0 }}>Sin versiones guardadas</p>
-                <p style={{ fontSize: '0.7rem', margin: 0, color: 'var(--text-muted)' }}>
-                  Las versiones se crean al compilar exitosamente
-                </p>
+                <IconHistory /><p style={{ margin: 0 }}>Sin versiones guardadas</p>
+                <p style={{ fontSize: '0.7rem', margin: 0, color: 'var(--text-muted)' }}>Las versiones se crean al compilar exitosamente</p>
               </div>
             ) : (
               versiones.map((v, idx) => (
-                <button
-                  key={v.id}
-                  onClick={() => seleccionarVersion(v)}
-                  style={{
-                    width: '100%', textAlign: 'left', background: 'none', border: 'none',
-                    borderBottom: '1px solid var(--border)',
-                    padding: '0.75rem 1rem', cursor: 'pointer',
-                    backgroundColor: seleccionada?.id === v.id ? 'rgba(56,189,248,0.08)' : 'transparent',
-                    borderLeft: seleccionada?.id === v.id ? '3px solid var(--accent)' : '3px solid transparent',
-                    transition: 'all 0.15s',
-                  }}
-                >
+                <button key={v.id} onClick={() => seleccionarVersion(v)} style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', borderBottom: '1px solid var(--border)', padding: '0.75rem 1rem', cursor: 'pointer', backgroundColor: seleccionada?.id === v.id ? 'rgba(56,189,248,0.08)' : 'transparent', borderLeft: seleccionada?.id === v.id ? '3px solid var(--accent)' : '3px solid transparent', transition: 'all 0.15s' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                     <IconCheckCircle />
-                    <span style={{
-                      color: seleccionada?.id === v.id ? 'var(--accent)' : 'var(--text-primary)',
-                      fontSize: '0.82rem', fontWeight: 700,
-                    }}>
-                      Versión {v.version}
-                    </span>
-                    {idx === 0 && (
-                      <span style={{
-                        fontSize: '0.6rem', background: 'rgba(52,211,153,0.15)',
-                        color: 'var(--accent3)', padding: '1px 5px', borderRadius: '4px',
-                      }}>
-                        última
-                      </span>
-                    )}
+                    <span style={{ color: seleccionada?.id === v.id ? 'var(--accent)' : 'var(--text-primary)', fontSize: '0.82rem', fontWeight: 700 }}>Versión {v.version}</span>
+                    {idx === 0 && <span style={{ fontSize: '0.6rem', background: 'rgba(52,211,153,0.15)', color: 'var(--accent3)', padding: '1px 5px', borderRadius: '4px' }}>última</span>}
                   </div>
-                  <div style={{
-                    color: 'var(--text-muted)', fontSize: '0.7rem',
-                    fontFamily: 'var(--font-mono)', marginBottom: '3px',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    {v.descripcion ?? 'Compilación exitosa'}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-muted)', fontSize: '0.67rem' }}>
-                    <IconClock />
-                    {formatFecha(v.fecha_modificacion)}
-                  </div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontFamily: 'var(--font-mono)', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.descripcion ?? 'Compilación exitosa'}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-muted)', fontSize: '0.67rem' }}><IconClock />{formatFecha(v.fecha_modificacion)}</div>
                 </button>
               ))
             )}
           </div>
-
-          {/* Panel derecho — preview */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             {seleccionada ? (
               <>
-                <div style={{
-                  padding: '0.6rem 1rem', borderBottom: '1px solid var(--border)',
-                  background: 'var(--bg-elevated)', flexShrink: 0,
-                  display: 'flex', alignItems: 'center', gap: '0.5rem',
-                }}>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', fontFamily: 'var(--font-mono)' }}>
-                    Vista previa — Versión {seleccionada.version}
-                  </span>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>·</span>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {seleccionada.descripcion ?? 'Compilación exitosa'}
-                  </span>
-                  {cargandoPreview && (
-                    <span style={{ color: 'var(--accent)', fontSize: '0.68rem', marginLeft: 'auto', flexShrink: 0 }}>
-                      Cargando...
-                    </span>
-                  )}
+                <div style={{ padding: '0.6rem 1rem', borderBottom: '1px solid var(--border)', background: 'var(--bg-elevated)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', fontFamily: 'var(--font-mono)' }}>Vista previa — Versión {seleccionada.version}</span>
+                  {cargandoPreview && <span style={{ color: 'var(--accent)', fontSize: '0.68rem', marginLeft: 'auto', flexShrink: 0 }}>Cargando...</span>}
                 </div>
                 <div style={{ flex: 1, overflow: 'hidden' }}>
-                  <Editor
-                    height="100%"
-                    defaultLanguage="plaintext"
-                    theme="vs-dark"
-                    value={contenidoPreview}
-                    options={{
-                      readOnly: true,
-                      fontSize: 12,
-                      fontFamily: 'JetBrains Mono, Fira Code, monospace',
-                      minimap: { enabled: false },
-                      lineNumbers: 'on',
-                      scrollBeyondLastLine: false,
-                      padding: { top: 12, bottom: 12 },
-                      renderLineHighlight: 'none',
-                      wordWrap: 'on',
-                    }}
-                  />
+                  <Editor height="100%" defaultLanguage="plaintext" theme="vs-dark" value={contenidoPreview} options={{ readOnly: true, fontSize: 12, fontFamily: 'JetBrains Mono, Fira Code, monospace', minimap: { enabled: false }, lineNumbers: 'on', scrollBeyondLastLine: false, padding: { top: 12, bottom: 12 }, renderLineHighlight: 'none', wordWrap: 'on' }} />
                 </div>
               </>
             ) : (
-              <div style={{
-                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'var(--text-muted)', fontSize: '0.8rem',
-                flexDirection: 'column', gap: '0.5rem',
-              }}>
-                <IconHistory />
-                <p>Selecciona una versión para ver el preview</p>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', flexDirection: 'column', gap: '0.5rem' }}>
+                <IconHistory /><p>Selecciona una versión para ver el preview</p>
               </div>
             )}
           </div>
         </div>
-
-        {/* Footer */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-          gap: '0.75rem', padding: '0.85rem 1.25rem',
-          borderTop: '1px solid var(--border)', background: 'var(--bg-elevated)', flexShrink: 0,
-        }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', flex: 1 }}>
-            {versiones.length > 0
-              ? `${versiones.length} versión${versiones.length !== 1 ? 'es' : ''} compilada${versiones.length !== 1 ? 's' : ''} exitosamente`
-              : ''}
-          </span>
-          <button
-            onClick={onCerrar}
-            style={{
-              background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-              color: 'var(--text-secondary)', borderRadius: '8px',
-              padding: '0.5rem 1rem', fontSize: '0.825rem', cursor: 'pointer',
-            }}
-          >
-            Cancelar
-          </button>
-          <button
-            disabled={!seleccionada}
-            onClick={() => seleccionada && onRestaurar(contenidoPreview, seleccionada.version)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '0.4rem',
-              background: seleccionada ? 'var(--accent)' : 'rgba(56,189,248,0.15)',
-              color: seleccionada ? '#000' : 'var(--text-muted)',
-              border: 'none', borderRadius: '8px',
-              padding: '0.5rem 1.1rem', fontSize: '0.825rem',
-              fontWeight: 700, cursor: seleccionada ? 'pointer' : 'not-allowed',
-              transition: 'all 0.2s',
-            }}
-          >
-            <IconRotateCcw />
-            Restaurar esta versión
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem', padding: '0.85rem 1.25rem', borderTop: '1px solid var(--border)', background: 'var(--bg-elevated)', flexShrink: 0 }}>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', flex: 1 }}>{versiones.length > 0 ? `${versiones.length} versión${versiones.length !== 1 ? 'es' : ''} compilada${versiones.length !== 1 ? 's' : ''} exitosamente` : ''}</span>
+          <button onClick={onCerrar} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: '8px', padding: '0.5rem 1rem', fontSize: '0.825rem', cursor: 'pointer' }}>Cancelar</button>
+          <button disabled={!seleccionada} onClick={() => seleccionada && onRestaurar(contenidoPreview, seleccionada.version)} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: seleccionada ? 'var(--accent)' : 'rgba(56,189,248,0.15)', color: seleccionada ? '#000' : 'var(--text-muted)', border: 'none', borderRadius: '8px', padding: '0.5rem 1.1rem', fontSize: '0.825rem', fontWeight: 700, cursor: seleccionada ? 'pointer' : 'not-allowed', transition: 'all 0.2s' }}>
+            <IconRotateCcw />Restaurar esta versión
           </button>
         </div>
       </div>
@@ -350,10 +187,8 @@ function ModalHistorial({ archivoId, archivoNombre, onRestaurar, onCerrar }: Mod
 
 // ── Menú Archivo ─────────────────────────────────────────────
 interface MenuArchivoProps {
-  onNuevo:        () => void;
-  onAbrir:        (archivo: FileListResponse) => void;
-  onVerHistorial: () => void;
-  archivoActualId: number | null;
+  onNuevo: () => void; onAbrir: (archivo: FileListResponse) => void;
+  onVerHistorial: () => void; archivoActualId: number | null;
 }
 
 function MenuArchivo({ onNuevo, onAbrir, onVerHistorial, archivoActualId }: MenuArchivoProps) {
@@ -364,16 +199,13 @@ function MenuArchivo({ onNuevo, onAbrir, onVerHistorial, archivoActualId }: Menu
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
-    };
+    const handler = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false); };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
   const handleToggle = async () => {
-    const next = !open;
-    setOpen(next);
+    const next = !open; setOpen(next);
     if (next && archivos.length === 0) {
       setCargando(true);
       try { setArchivos(await listarArchivos()); }
@@ -396,83 +228,34 @@ function MenuArchivo({ onNuevo, onAbrir, onVerHistorial, archivoActualId }: Menu
 
   return (
     <div ref={menuRef} style={{ position: 'relative' }}>
-      <button onClick={handleToggle} style={styles.btnArchivo}>
-        <IconFolder />
-        Archivo
-        <IconChevronDown />
-      </button>
-
+      <button onClick={handleToggle} style={styles.btnArchivo}><IconFolder />Archivo<IconChevronDown /></button>
       {open && (
         <div style={styles.archivoDropdown}>
-          <div style={styles.archivoHeader}>
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Menú Archivo</span>
-          </div>
-
-          {/* Nuevo */}
-          <button onClick={() => { onNuevo(); setOpen(false); }} style={styles.archivoAccion}>
-            <IconFilePlus />
-            <div>
-              <div style={{ color: 'var(--text-primary)', fontSize: '0.82rem', fontWeight: 600 }}>Nuevo archivo</div>
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>Limpiar editor y empezar desde cero</div>
-            </div>
-          </button>
-
-          {/* Historial — solo si hay archivo activo */}
+          <div style={styles.archivoHeader}><span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Menú Archivo</span></div>
+          <button onClick={() => { onNuevo(); setOpen(false); }} style={styles.archivoAccion}><IconFilePlus /><div><div style={{ color: 'var(--text-primary)', fontSize: '0.82rem', fontWeight: 600 }}>Nuevo archivo</div><div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>Limpiar editor y empezar desde cero</div></div></button>
           {archivoActualId && (
-            <button onClick={() => { onVerHistorial(); setOpen(false); }} style={styles.archivoAccion}>
-              <IconHistory />
-              <div>
-                <div style={{ color: 'var(--text-primary)', fontSize: '0.82rem', fontWeight: 600 }}>Historial de versiones</div>
-                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>Ver y restaurar compilaciones exitosas</div>
-              </div>
-            </button>
+            <button onClick={() => { onVerHistorial(); setOpen(false); }} style={styles.archivoAccion}><IconHistory /><div><div style={{ color: 'var(--text-primary)', fontSize: '0.82rem', fontWeight: 600 }}>Historial de versiones</div><div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>Ver y restaurar compilaciones exitosas</div></div></button>
           )}
-
           <div style={{ height: '1px', background: 'var(--border)' }} />
-
-          {/* Lista guardados */}
-          <div style={{ padding: '6px 10px 4px' }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.67rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Abrir guardado</span>
-          </div>
-
-          {cargando ? (
-            <div style={styles.archivoEmpty}>Cargando archivos...</div>
-          ) : archivos.length === 0 ? (
-            <div style={styles.archivoEmpty}>No hay archivos guardados aún</div>
-          ) : (
-            <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
+          <div style={{ padding: '6px 10px 4px' }}><span style={{ color: 'var(--text-muted)', fontSize: '0.67rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Abrir guardado</span></div>
+          {cargando ? <div style={styles.archivoEmpty}>Cargando archivos...</div>
+            : archivos.length === 0 ? <div style={styles.archivoEmpty}>No hay archivos guardados aún</div>
+            : <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
               {archivos.map(a => (
-                <button
-                  key={a.id}
-                  onClick={() => handleSeleccionar(a)}
-                  disabled={abriendo === a.id}
-                  style={{
-                    ...styles.archivoItem,
-                    backgroundColor: archivoActualId === a.id ? 'rgba(56,189,248,0.08)' : 'transparent',
-                    borderLeft:      archivoActualId === a.id ? '2px solid var(--accent)' : '2px solid transparent',
-                  }}
-                >
+                <button key={a.id} onClick={() => handleSeleccionar(a)} disabled={abriendo === a.id} style={{ ...styles.archivoItem, backgroundColor: archivoActualId === a.id ? 'rgba(56,189,248,0.08)' : 'transparent', borderLeft: archivoActualId === a.id ? '2px solid var(--accent)' : '2px solid transparent' }}>
                   <IconFileOpen />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ color: archivoActualId === a.id ? 'var(--accent)' : 'var(--text-primary)', fontSize: '0.82rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {a.nombre_archivo}
-                      </span>
+                      <span style={{ color: archivoActualId === a.id ? 'var(--accent)' : 'var(--text-primary)', fontSize: '0.82rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.nombre_archivo}</span>
                       <span style={{ color: 'var(--text-muted)', fontSize: '0.65rem', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>v{a.version}</span>
-                      {archivoActualId === a.id && (
-                        <span style={{ fontSize: '0.6rem', background: 'rgba(56,189,248,0.15)', color: 'var(--accent)', padding: '1px 5px', borderRadius: '4px', flexShrink: 0 }}>actual</span>
-                      )}
+                      {archivoActualId === a.id && <span style={{ fontSize: '0.6rem', background: 'rgba(56,189,248,0.15)', color: 'var(--accent)', padding: '1px 5px', borderRadius: '4px', flexShrink: 0 }}>actual</span>}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-muted)', fontSize: '0.67rem', marginTop: '2px' }}>
-                      <IconClock />
-                      {formatFecha(a.fecha_modificacion)}
-                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-muted)', fontSize: '0.67rem', marginTop: '2px' }}><IconClock />{formatFecha(a.fecha_modificacion)}</div>
                   </div>
                   {abriendo === a.id && <span style={{ color: 'var(--accent)', fontSize: '0.68rem', flexShrink: 0 }}>Abriendo...</span>}
                 </button>
               ))}
-            </div>
-          )}
+            </div>}
         </div>
       )}
     </div>
@@ -490,9 +273,7 @@ function HDivider({ onDrag }: { onDrag: (dx: number) => void }) {
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
   }, [onDrag]);
   return (
-    <div onMouseDown={onMouseDown} style={{ width: '6px', flexShrink: 0, cursor: 'col-resize', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s' }}
-      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(56,189,248,0.2)')}
-      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+    <div onMouseDown={onMouseDown} style={{ width: '6px', flexShrink: 0, cursor: 'col-resize', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(56,189,248,0.2)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
       <div style={{ width: '2px', height: '40px', borderRadius: '2px', background: 'var(--border)' }} />
     </div>
   );
@@ -508,9 +289,7 @@ function VDivider({ onDrag }: { onDrag: (dy: number) => void }) {
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
   }, [onDrag]);
   return (
-    <div onMouseDown={onMouseDown} style={{ height: '6px', flexShrink: 0, cursor: 'row-resize', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s' }}
-      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(56,189,248,0.2)')}
-      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+    <div onMouseDown={onMouseDown} style={{ height: '6px', flexShrink: 0, cursor: 'row-resize', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s' }} onMouseEnter={e => (e.currentTarget.style.background = 'rgba(56,189,248,0.2)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
       <div style={{ height: '2px', width: '40px', borderRadius: '2px', background: 'var(--border)' }} />
     </div>
   );
@@ -539,43 +318,149 @@ function AstNodo({ nodo, depth = 0 }: { nodo: AstNodoDto; depth?: number }) {
   );
 }
 
-// ── Simulación ───────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+// SIMULACIÓN — CORREGIDA
+//
+// Cambios vs versión anterior:
+//   1. girar(1)  → arco de pivote real a la DERECHA (90°)
+//      La rueda derecha es el pivote, la izquierda describe el arco.
+//   2. girar(-1) → arco de pivote real a la IZQUIERDA (90°)
+//   3. girar(0)  → avanza RECTO 10cm (según spec: "ambos motores, línea recta")
+//   4. avanzar_vlts → escala correcta: 20.4cm por vuelta (llanta Ø 6.5cm)
+// ══════════════════════════════════════════════════════════════
 interface SimPoint   { x: number; y: number; angle: number; }
 interface SimSegment { points: SimPoint[]; instrIdx: number; }
+
+// 60px = 1 metro = 100cm → escala de la simulación
 const METRO_PX = 60;
+// Distancia entre ruedas para el pivote (visual, ligeramente ampliada para claridad)
+const WHEEL_BASE_PX = 18;
+// Circunferencia real de la llanta: π × 6.5cm ≈ 20.4cm
+const CM_POR_VUELTA = 20.4;
 
 function calcularTrayectoria(instrucciones: InstruccionDto[]): SimSegment[] {
   const segments: SimSegment[] = [];
-  let x = 0, y = 0, angle = -Math.PI / 2;
+  let x = 0, y = 0, angle = -Math.PI / 2; // ángulo inicial: apunta hacia arriba
+
   for (let idx = 0; idx < instrucciones.length; idx++) {
-    const inst = instrucciones[idx];
-    const n = inst.parametro_n ?? inst.parametro_r ?? inst.parametro_l ?? 1;
+    const inst  = instrucciones[idx];
+    const n     = inst.parametro_n ?? inst.parametro_r ?? inst.parametro_l ?? 1;
     const nombre = inst.nombre.toLowerCase();
     const pts: SimPoint[] = [{ x, y, angle }];
-    const pasos = (dist: number, dir: number, steps: number) => {
-      for (let s = 1; s <= steps; s++) { x += Math.cos(angle) * (dist / steps) * dir; y += Math.sin(angle) * (dist / steps) * dir; pts.push({ x, y, angle }); }
+
+    // ── helper: avanzar N píxeles en la dirección actual ──────
+    const avanzarPx = (px: number, dir: number, steps: number) => {
+      for (let s = 1; s <= steps; s++) {
+        x += Math.cos(angle) * (px / steps) * dir;
+        y += Math.sin(angle) * (px / steps) * dir;
+        pts.push({ x, y, angle });
+      }
     };
-    if      (nombre === 'avanzar_mts')  { pasos(Math.abs(n) * METRO_PX, n > 0 ? 1 : -1, 40); }
-    else if (nombre === 'avanzar_ctms') { pasos(Math.abs(n) * METRO_PX / 100, n > 0 ? 1 : -1, 20); }
-    else if (nombre === 'avanzar_vlts') { pasos(Math.abs(n) * METRO_PX * 0.25, n > 0 ? 1 : -1, 20); }
-    else if (nombre === 'girar')        { pts.push({ x, y, angle }); }
-    else if (nombre === 'circulo') {
-      const r = Math.abs(n) * METRO_PX / 100; const sa = angle;
-      for (let s = 1; s <= 80; s++) { const a = sa + (Math.PI * 2 * s) / 80; pts.push({ x: x + Math.cos(a) * r - Math.cos(sa) * r, y: y + Math.sin(a) * r - Math.sin(sa) * r, angle: a + Math.PI / 2 }); }
+
+    if (nombre === 'avanzar_mts') {
+      avanzarPx(Math.abs(n) * METRO_PX, n > 0 ? 1 : -1, 40);
+
+    } else if (nombre === 'avanzar_ctms') {
+      // METRO_PX / 100 = píxeles por centímetro
+      avanzarPx(Math.abs(n) * METRO_PX / 100, n > 0 ? 1 : -1, Math.max(10, Math.abs(n)));
+
+    } else if (nombre === 'avanzar_vlts') {
+      // 1 vuelta = CM_POR_VUELTA cm = CM_POR_VUELTA * METRO_PX/100 px
+      const pxPerVuelta = CM_POR_VUELTA * METRO_PX / 100; // ≈ 12.24 px
+      avanzarPx(Math.abs(n) * pxPerVuelta, n > 0 ? 1 : -1, 20);
+
+    } else if (nombre === 'girar') {
+
+      if (n === 0) {
+        // girar(0) = AMBOS motores = avanzar recto 10cm
+        avanzarPx(10 * METRO_PX / 100, 1, 10);
+
+      } else {
+        // girar(1)  = solo motor IZQ → pivote a la DERECHA (+90°)
+        // girar(-1) = solo motor DER → pivote a la IZQUIERDA (-90°)
+        const dir = n > 0 ? 1 : -1;
+        const steps = 24;
+
+        // El punto de pivote está perpendicular a la dirección actual
+        // a una distancia de WHEEL_BASE_PX (la rueda que no se mueve)
+        const pivotAngle = angle + dir * Math.PI / 2;
+        const pivotX = x + Math.cos(pivotAngle) * WHEEL_BASE_PX;
+        const pivotY = y + Math.sin(pivotAngle) * WHEEL_BASE_PX;
+
+        for (let s = 1; s <= steps; s++) {
+          const newAngle     = angle + dir * (Math.PI / 2 * s / steps);
+          // Centro del rover: siempre a WHEEL_BASE_PX del pivote,
+          // en la dirección opuesta al pivote relativo al nuevo ángulo
+          const backAngle    = newAngle - dir * Math.PI / 2;
+          x = pivotX + Math.cos(backAngle) * WHEEL_BASE_PX;
+          y = pivotY + Math.sin(backAngle) * WHEEL_BASE_PX;
+          pts.push({ x, y, angle: newAngle });
+        }
+        angle += dir * Math.PI / 2;
+        // Sincronizar x,y con el último punto calculado
+        if (pts.length > 1) {
+          x = pts[pts.length - 1].x;
+          y = pts[pts.length - 1].y;
+        }
+      }
+
+    } else if (nombre === 'circulo') {
+      const r = Math.abs(n) * METRO_PX / 100;
+      const sa = angle;
+      for (let s = 1; s <= 80; s++) {
+        const a = sa + (Math.PI * 2 * s) / 80;
+        pts.push({
+          x: x + Math.cos(a) * r - Math.cos(sa) * r,
+          y: y + Math.sin(a) * r - Math.sin(sa) * r,
+          angle: a + Math.PI / 2,
+        });
+      }
+      // Posición final = igual que inicio (círculo completo)
+
     } else if (nombre === 'cuadrado') {
       const lado = Math.abs(n) * METRO_PX / 100;
-      for (let side = 0; side < 4; side++) { for (let s = 1; s <= 15; s++) { x += Math.cos(angle) * (lado / 15); y += Math.sin(angle) * (lado / 15); pts.push({ x, y, angle }); } angle += Math.PI / 2; pts.push({ x, y, angle }); }
+      // Calcular tiempo de pivote de 90° con la misma fórmula que girar
+      for (let side = 0; side < 4; side++) {
+        // Avanzar lado
+        for (let s = 1; s <= 15; s++) {
+          x += Math.cos(angle) * (lado / 15);
+          y += Math.sin(angle) * (lado / 15);
+          pts.push({ x, y, angle });
+        }
+        // Pivote 90° (ambos motores opuestos = giro en punto fijo)
+        const pivotSteps = 16;
+        const cx = x, cy = y;
+        for (let s = 1; s <= pivotSteps; s++) {
+          const newAngle = angle + (Math.PI / 2 * s / pivotSteps);
+          pts.push({ x: cx, y: cy, angle: newAngle });
+        }
+        angle += Math.PI / 2;
+      }
+
     } else if (nombre === 'rotar') {
-      const vueltas = Math.abs(n); const dir = n > 0 ? 1 : -1;
-      for (let s = 1; s <= 40; s++) { angle += (Math.PI * 2 * vueltas * dir) / 40; pts.push({ x, y, angle }); }
-    } else if (nombre === 'caminar')  { pasos(Math.abs(n) * METRO_PX * 0.18, n > 0 ? 1 : -1, 25); }
-    else if  (nombre === 'moonwalk') { pasos(Math.abs(n) * METRO_PX * 0.18, n > 0 ? -1 : 1, 25); }
-    else { pts.push({ x, y, angle }); }
+      const vueltas = Math.abs(n);
+      const dir     = n > 0 ? 1 : -1;
+      for (let s = 1; s <= 40; s++) {
+        angle += (Math.PI * 2 * vueltas * dir) / 40;
+        pts.push({ x, y, angle });
+      }
+
+    } else if (nombre === 'caminar') {
+      avanzarPx(Math.abs(n) * METRO_PX * 0.18, n > 0 ? 1 : -1, 25);
+
+    } else if (nombre === 'moonwalk') {
+      avanzarPx(Math.abs(n) * METRO_PX * 0.18, n > 0 ? -1 : 1, 25);
+
+    } else {
+      pts.push({ x, y, angle });
+    }
+
     segments.push({ points: pts, instrIdx: idx });
   }
   return segments;
 }
 
+// ── Componente Simulador ──────────────────────────────────────
 interface SimuladorProps { instrucciones: InstruccionDto[]; activeInstrIdx: number; animProgress: number; }
 
 function Simulador({ instrucciones, activeInstrIdx, animProgress }: SimuladorProps) {
@@ -588,53 +473,70 @@ function Simulador({ instrucciones, activeInstrIdx, animProgress }: SimuladorPro
   const [zoomDisplay, setZoomDisplay] = useState(100);
 
   useEffect(() => {
-    segRef.current = calcularTrayectoria(instrucciones); zoomRef.current = 1; offsetRef.current = { x: 0, y: 0 };
+    segRef.current = calcularTrayectoria(instrucciones);
+    zoomRef.current = 1; offsetRef.current = { x: 0, y: 0 };
     if (segRef.current.length > 0) {
       const allPts = segRef.current.flatMap(s => s.points);
       const xs = allPts.map(p => p.x); const ys = allPts.map(p => p.y);
-      const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+      const minX = Math.min(...xs), maxX = Math.max(...xs);
+      const minY = Math.min(...ys), maxY = Math.max(...ys);
       const W = canvasRef.current?.width ?? 320; const H = canvasRef.current?.height ?? 240;
-      const pad = 40; const scale = Math.min((W - pad * 2) / (maxX - minX || 1), (H - pad * 2) / (maxY - minY || 1), 3);
-      autoZoomRef.current = scale; autoOffRef.current = { x: W / 2 - ((minX + maxX) / 2) * scale, y: H / 2 - ((minY + maxY) / 2) * scale };
+      const pad = 40;
+      const scale = Math.min((W - pad * 2) / (maxX - minX || 1), (H - pad * 2) / (maxY - minY || 1), 3);
+      autoZoomRef.current = scale;
+      autoOffRef.current = { x: W / 2 - ((minX + maxX) / 2) * scale, y: H / 2 - ((minY + maxY) / 2) * scale };
     }
     setZoomDisplay(Math.round(zoomRef.current * 100));
   }, [instrucciones]);
 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
-    const onWheel = (e: WheelEvent) => { e.preventDefault(); zoomRef.current = Math.min(Math.max(zoomRef.current * (e.deltaY < 0 ? 1.12 : 0.88), 0.1), 10); setZoomDisplay(Math.round(zoomRef.current * 100)); };
-    canvas.addEventListener('wheel', onWheel, { passive: false }); return () => canvas.removeEventListener('wheel', onWheel);
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      zoomRef.current = Math.min(Math.max(zoomRef.current * (e.deltaY < 0 ? 1.12 : 0.88), 0.1), 10);
+      setZoomDisplay(Math.round(zoomRef.current * 100));
+    };
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', onWheel);
   }, []);
 
   const changeZoom = (f: number) => { zoomRef.current = Math.min(Math.max(zoomRef.current * f, 0.1), 10); setZoomDisplay(Math.round(zoomRef.current * 100)); };
   const resetZoom  = () => { zoomRef.current = 1; offsetRef.current = { x: 0, y: 0 }; setZoomDisplay(100); };
 
   useEffect(() => {
-    const canvas = canvasRef.current; if (!canvas) return; const ctx = canvas.getContext('2d'); if (!ctx) return;
+    const canvas = canvasRef.current; if (!canvas) return;
+    const ctx = canvas.getContext('2d'); if (!ctx) return;
     const W = canvas.width, H = canvas.height;
     ctx.clearRect(0, 0, W, H); ctx.fillStyle = '#0a0f1a'; ctx.fillRect(0, 0, W, H);
     const totalZoom = autoZoomRef.current * zoomRef.current;
-    const ox = autoOffRef.current.x + offsetRef.current.x; const oy = autoOffRef.current.y + offsetRef.current.y;
+    const ox = autoOffRef.current.x + offsetRef.current.x;
+    const oy = autoOffRef.current.y + offsetRef.current.y;
     ctx.save(); ctx.translate(ox, oy); ctx.scale(totalZoom, totalZoom);
-    const gridStep = METRO_PX / 2; ctx.strokeStyle = 'rgba(56,189,248,0.05)'; ctx.lineWidth = 0.5 / totalZoom;
+    // Grid
+    const gridStep = METRO_PX / 2;
+    ctx.strokeStyle = 'rgba(56,189,248,0.05)'; ctx.lineWidth = 0.5 / totalZoom;
     const gx0 = -ox/totalZoom, gy0 = -oy/totalZoom, gxN = (W-ox)/totalZoom, gyN = (H-oy)/totalZoom;
     for (let gx = Math.floor(gx0/gridStep)*gridStep; gx <= gxN; gx += gridStep) { ctx.beginPath(); ctx.moveTo(gx,gy0); ctx.lineTo(gx,gyN); ctx.stroke(); }
     for (let gy = Math.floor(gy0/gridStep)*gridStep; gy <= gyN; gy += gridStep) { ctx.beginPath(); ctx.moveTo(gx0,gy); ctx.lineTo(gxN,gy); ctx.stroke(); }
+    // Origen
     ctx.beginPath(); ctx.arc(0,0,4/totalZoom,0,Math.PI*2); ctx.fillStyle='rgba(56,189,248,0.6)'; ctx.fill();
     ctx.strokeStyle='rgba(56,189,248,0.4)'; ctx.lineWidth=1/totalZoom; ctx.beginPath(); ctx.arc(0,0,10/totalZoom,0,Math.PI*2); ctx.stroke();
     if (segRef.current.length === 0) { ctx.restore(); return; }
+    // Trayectoria fantasma
     ctx.setLineDash([4/totalZoom,4/totalZoom]); ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=1/totalZoom; ctx.beginPath();
     let firstPt = true;
     for (const seg of segRef.current) { for (const pt of seg.points) { if (firstPt) { ctx.moveTo(pt.x,pt.y); firstPt=false; } else ctx.lineTo(pt.x,pt.y); } }
     ctx.stroke(); ctx.setLineDash([]);
+    // Segmentos activos
     for (let i = 0; i <= Math.min(activeInstrIdx, segRef.current.length-1); i++) {
       const seg = segRef.current[i]; if (!seg) continue;
-      const isActive = i===activeInstrIdx;
+      const isActive = i === activeInstrIdx;
       const pts = isActive ? seg.points.slice(0, Math.max(2, Math.round(seg.points.length*animProgress))) : seg.points;
       ctx.beginPath(); ctx.lineWidth=(isActive?2:1.5)/totalZoom; ctx.strokeStyle=isActive?'#38bdf8':'rgba(56,189,248,0.55)';
       let f=true; for (const pt of pts) { if(f){ctx.moveTo(pt.x,pt.y);f=false;}else ctx.lineTo(pt.x,pt.y); } ctx.stroke();
       const p0=seg.points[0]; ctx.beginPath(); ctx.arc(p0.x,p0.y,(isActive?3:2)/totalZoom,0,Math.PI*2); ctx.fillStyle=isActive?'#38bdf8':'rgba(56,189,248,0.5)'; ctx.fill();
     }
+    // Rover animado
     const activeSeg = segRef.current[Math.min(activeInstrIdx, segRef.current.length-1)];
     if (activeSeg && activeInstrIdx >= 0) {
       const pts=activeSeg.points; const rawIdx=animProgress*(pts.length-1);
@@ -668,15 +570,12 @@ const zoomBtn: React.CSSProperties = { background: 'rgba(56,189,248,0.1)', borde
 
 // ── Registro del lenguaje UMG++ en Monaco ────────────────────
 import type * as Monaco from 'monaco-editor';
-
-// Registrar el tema globalmente antes del primer mount
 let temaRegistrado = false;
 
 function registrarLenguajeUmgpp(monaco: typeof Monaco) {
   const yaRegistrado = monaco.languages.getLanguages().some(l => l.id === 'umgpp');
   if (!yaRegistrado) {
     monaco.languages.register({ id: 'umgpp' });
-
     monaco.languages.setMonarchTokensProvider('umgpp', {
       tokenizer: {
         root: [
@@ -690,29 +589,25 @@ function registrarLenguajeUmgpp(monaco: typeof Monaco) {
       },
     });
   }
-
   if (!temaRegistrado) {
     monaco.editor.defineTheme('umgpp-dark', {
-      base: 'vs-dark',
-      inherit: true,
+      base: 'vs-dark', inherit: true,
       rules: [
         { token: 'keyword', foreground: '4A9EFF', fontStyle: 'bold' },
         { token: 'command', foreground: '38BDF8' },
         { token: 'paren',   foreground: '4ADE80' },
         { token: 'number',  foreground: 'F87171' },
       ],
-      colors: {
-        'editor.background': '#0d1117',
-      },
+      colors: { 'editor.background': '#0d1117' },
     });
     temaRegistrado = true;
   }
-
   monaco.editor.setTheme('umgpp-dark');
 }
 
 // ── Constantes ───────────────────────────────────────────────
 const CODIGO_EJEMPLO = `PROGRAM mi_ruta\nBEGIN\n  avanzar_mts(3);\n  girar(1);\n  circulo(50);\nEND.\n`;
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5123';
 type OutputTab  = 'consola' | 'tokens' | 'instrucciones' | 'codigo' | 'ast';
 type OutputLine = { type: 'info' | 'success' | 'error' | 'warn'; text: string };
 
@@ -746,19 +641,47 @@ export function EditorPage() {
   const [animProgress, setAnimProgress]   = useState(0);
   const rafRef      = useRef<number>(0);
   const simStateRef = useRef({ idx: -1, running: false });
-  const wsRoverRef  = useRef<WebSocket | null>(null);
   const [isSendingRover, setIsSendingRover] = useState(false);
   const monacoRef = useRef<typeof import('monaco-editor') | null>(null);
-
-  // ── Historial ────────────────────────────────────────────────
   const [historialOpen, setHistorialOpen] = useState(false);
-
-  // ── Autoguardado ─────────────────────────────────────────────
-  const [archivoId, setArchivoId] = useState<number | null>(null);
-  const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5123';
+  const [archivoId, setArchivoId]         = useState<number | null>(null);
 
   const { status: saveStatus, lastSavedAt, restoreFromLocal, getLocalTimestamp, getLocalArchivoId, markAsSaved, clearLocal } =
     useAutoSave({ code, archivoId, setArchivoId });
+
+  // ── SignalR — reemplaza el WebSocket raw ─────────────────────
+  const addLine = useCallback((type: OutputLine['type'], text: string) =>
+    setConsolaLines(prev => [...prev, { type, text }]), []);
+
+  const { connect: connectSignalR, disconnect: disconnectSignalR } = useRoverSignalR({
+    onConnected:    () => addLine('info', '📶 Conexión en tiempo real establecida con el rover'),
+    onDisconnected: () => addLine('info', '🔌 Conexión con el rover cerrada'),
+    onError:        (msg) => addLine('error', `❌ ${msg}`),
+
+    onStatus: (data) => {
+      if (data.status === 'offline') addLine('warn', '⚠️ Rover desconectado');
+      else if (data.status === 'ejecutando') addLine('info', `🤖 Rover ejecutando compilación #${data.compilacion_id ?? ''}`);
+    },
+
+    onAck: (data) => {
+      if (data.estado === 'ok') {
+        addLine('success', `✅ ACK recibido: ${data.mensaje}`);
+      } else if (data.estado === 'completado') {
+        addLine('success', '🏁 Rover completó la ejecución');
+        toast.success('Rover completó la ejecución 🏁');
+        disconnectSignalR();
+      } else if (data.estado === 'error') {
+        addLine('error', `❌ Error en rover: ${data.mensaje}`);
+        toast.error(`Error en rover: ${data.mensaje}`);
+      } else if (data.estado === 'stopped') {
+        addLine('warn', '⚠️ Rover detenido por STOP de emergencia');
+      }
+    },
+
+    onProgreso: (data) => {
+      addLine('info', `🤖 Rover → instrucción ${data.progreso}/${data.total}`);
+    },
+  });
 
   // ── Restaurar al montar ──────────────────────────────────────
   useEffect(() => {
@@ -767,8 +690,7 @@ export function EditorPage() {
     const localCode = restoreFromLocal();
     const localTs   = getLocalTimestamp();
     if (localCode && localTs > Date.now() - 1000 * 60 * 60 * 24 && localCode !== CODIGO_EJEMPLO) {
-      setCode(localCode);
-      markAsSaved(localCode);
+      setCode(localCode); markAsSaved(localCode);
       addLine('info', '💾 Código restaurado desde autoguardado local');
       toast.info('Código restaurado desde el último autoguardado');
     }
@@ -787,7 +709,7 @@ export function EditorPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  useEffect(() => () => { cancelAnimationFrame(rafRef.current); wsRoverRef.current?.close(); }, []);
+  useEffect(() => () => { cancelAnimationFrame(rafRef.current); disconnectSignalR(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onDragDiv1 = useCallback((dx: number) => {
     const total = containerRef.current?.clientWidth ?? 1; const pct = (dx / total) * 100;
@@ -805,7 +727,6 @@ export function EditorPage() {
   }, []);
 
   const handleLogout = async () => { try { await logoutUser(); } finally { logout(); toast.success('Sesión cerrada.'); navigate('/login'); } };
-  const addLine = (type: OutputLine['type'], text: string) => setConsolaLines(prev => [...prev, { type, text }]);
 
   // ── Menú Archivo: Nuevo ──────────────────────────────────────
   const handleNuevo = useCallback(() => {
@@ -832,30 +753,22 @@ export function EditorPage() {
       setActiveTab('consola');
       addLine('info', `📂 Archivo abierto: ${detalle.nombre_archivo} (v${detalle.version})`);
       toast.success(`Archivo "${detalle.nombre_archivo}" cargado`);
-    } catch {
-      toast.error('No se pudo abrir el archivo.');
-    }
-  }, [markAsSaved]);
+    } catch { toast.error('No se pudo abrir el archivo.'); }
+  }, [markAsSaved, addLine]);
 
-  // ── Historial: Restaurar versión ─────────────────────────────
+  // ── Historial: Restaurar ─────────────────────────────────────
   const handleRestaurarVersion = useCallback((contenido: string, version: number) => {
-    setCode(contenido);
-    setHistorialOpen(false);
+    setCode(contenido); setHistorialOpen(false);
     setConsolaLines([]); setTokens([]); setInstrucciones([]);
     setCodigoTranspilado(''); setAstData(null);
     setSimActiveIdx(-1); setAnimProgress(0);
     cancelAnimationFrame(rafRef.current);
     setIsSimulating(false); simStateRef.current.running = false;
     setActiveTab('consola');
-    addLine('info', `🔄 Versión ${version} restaurada — compila para crear una nueva versión en el historial`);
+    addLine('info', `🔄 Versión ${version} restaurada`);
     toast.success(`Versión ${version} restaurada en el editor`);
-
-    setTimeout(() => {
-      if (monacoRef.current) {
-        monacoRef.current.editor.setTheme('umgpp-dark');
-      }
-    }, 150);
-  }, []);
+    setTimeout(() => { if (monacoRef.current) monacoRef.current.editor.setTheme('umgpp-dark'); }, 150);
+  }, [addLine]);
 
   // ── Compilar ─────────────────────────────────────────────────
   const handleCompile = async () => {
@@ -878,22 +791,13 @@ export function EditorPage() {
         setCompilaciones(c => c + 1);
         toast.success(`Compilación exitosa en ${result.tiempo_ms}ms 🚀`);
         setTimeout(() => setActiveTab('codigo'), 600);
-
-        // Guardar versión en historial solo si compiló exitosamente
         if (archivoId) {
           try {
-            await actualizarArchivo(archivoId, {
-              contenido:         code,
-              comentario:        `Compilación exitosa — ${result.instrucciones.length} instrucciones`,
-              guardar_historial: true,
-            });
+            await actualizarArchivo(archivoId, { contenido: code, comentario: `Compilación exitosa — ${result.instrucciones.length} instrucciones`, guardar_historial: true });
             markAsSaved(code);
             addLine('info', '📌 Versión guardada en historial');
-          } catch {
-            // No interrumpir el flujo si falla el guardado del historial
-          }
+          } catch { /* no interrumpir flujo */ }
         }
-
       } else {
         addLine('error', `❌ Compilación fallida: ${result.resultado}`);
         result.errores.forEach((e: ErrorDto) => {
@@ -913,7 +817,11 @@ export function EditorPage() {
   // ── Simular ──────────────────────────────────────────────────
   const handleSimular = useCallback(() => {
     if (instrucciones.length === 0) { toast.error('Compila primero para simular.'); return; }
-    if (isSimulating) { simStateRef.current.running = false; cancelAnimationFrame(rafRef.current); setIsSimulating(false); setSimActiveIdx(-1); setAnimProgress(0); toast.info('Simulación detenida.'); return; }
+    if (isSimulating) {
+      simStateRef.current.running = false; cancelAnimationFrame(rafRef.current);
+      setIsSimulating(false); setSimActiveIdx(-1); setAnimProgress(0);
+      toast.info('Simulación detenida.'); return;
+    }
     const SEG_DURATION = 900;
     simStateRef.current = { idx: 0, running: true };
     setIsSimulating(true); setSimActiveIdx(0); setAnimProgress(0); toast.success('Simulación iniciada 🚗');
@@ -927,43 +835,41 @@ export function EditorPage() {
       if (progress < 1) { rafRef.current = requestAnimationFrame(animate); }
       else {
         const nextIdx = simStateRef.current.idx + 1;
-        if (nextIdx >= instrucciones.length) { simStateRef.current.running = false; setIsSimulating(false); setAnimProgress(1); toast.success('Simulación completada ✅'); }
-        else { simStateRef.current.idx = nextIdx; setSimActiveIdx(nextIdx); setAnimProgress(0); startTime = null; rafRef.current = requestAnimationFrame(animate); }
+        if (nextIdx >= instrucciones.length) {
+          simStateRef.current.running = false; setIsSimulating(false); setAnimProgress(1);
+          toast.success('Simulación completada ✅');
+        } else {
+          simStateRef.current.idx = nextIdx; setSimActiveIdx(nextIdx); setAnimProgress(0);
+          startTime = null; rafRef.current = requestAnimationFrame(animate);
+        }
       }
     };
     rafRef.current = requestAnimationFrame(animate);
   }, [instrucciones, isSimulating]);
 
-  // ── Enviar Rover ─────────────────────────────────────────────
+  // ── Enviar Rover — usa SignalR en lugar de WebSocket raw ─────
   const handleEnviarRover = async () => {
     if (!lastCompilacionId) { toast.error('Compila primero antes de enviar al rover.'); return; }
     setIsSendingRover(true);
     try {
       const token = localStorage.getItem('rover_token');
-      const res = await fetch(`${API_URL}/api/Rover/execute`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ compilacion_id:   lastCompilacionId, lenguaje_destino: selectedLang,}) });
+      const res = await fetch(`${API_URL}/api/Rover/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ compilacion_id: lastCompilacionId, lenguaje_destino: selectedLang }),
+      });
       const data = await res.json();
       if (res.ok && data.exitoso) {
         addLine('success', `🚀 Instrucciones enviadas al rover (transmisión #${data.transmision_id})`);
         addLine('info', `📡 ${data.total_instrucciones} instrucciones publicadas vía MQTT`);
         toast.success('¡Instrucciones enviadas al rover! 🤖'); setActiveTab('consola');
-        if (wsRoverRef.current) wsRoverRef.current.close();
-        const WS_URL = API_URL.replace('https','wss').replace('http','ws');
-        const ws = new WebSocket(`${WS_URL}/ws/rover?token=${token}`);
-        wsRoverRef.current = ws;
-        ws.onopen    = () => addLine('info', '📶 Conexión en tiempo real establecida con el rover');
-        ws.onmessage = (event) => {
-          try {
-            const msg = JSON.parse(event.data);
-            if      (msg.tipo==='progreso')   addLine('info',    `🤖 Rover → instrucción ${msg.instruccion_actual}/${msg.total}: ${msg.comando??''}`);
-            else if (msg.tipo==='ack')        addLine('success', `✅ ACK recibido: ${msg.mensaje??'instrucción ejecutada'}`);
-            else if (msg.tipo==='completado') { addLine('success','🏁 Rover completó la ejecución'); toast.success('Rover completó la ejecución 🏁'); ws.close(); }
-            else if (msg.tipo==='error')      { addLine('error', `❌ Error en rover: ${msg.mensaje}`); toast.error(`Error en rover: ${msg.mensaje}`); ws.close(); }
-          } catch { addLine('warn','⚠️ Mensaje no reconocido del rover'); }
-        };
-        ws.onerror = () => addLine('error','❌ Error en la conexión WebSocket con el rover');
-        ws.onclose = () => addLine('info', '🔌 Conexión con el rover cerrada');
-      } else { addLine('error',`❌ ${data.error??'Error al enviar al rover'}`); toast.error(data.error??'Error al enviar al rover'); }
-    } catch { addLine('error','❌ No se pudo conectar con el servidor.'); toast.error('Error de conexión al enviar al rover.'); }
+        // Conectar SignalR para recibir ACKs en tiempo real
+        await connectSignalR();
+      } else {
+        addLine('error', `❌ ${data.error ?? 'Error al enviar al rover'}`);
+        toast.error(data.error ?? 'Error al enviar al rover');
+      }
+    } catch { addLine('error', '❌ No se pudo conectar con el servidor.'); toast.error('Error de conexión al enviar al rover.'); }
     finally { setIsSendingRover(false); setActiveTab('consola'); }
   };
 
@@ -976,7 +882,7 @@ export function EditorPage() {
       if (result.exitoso && result.arbol) { setAstData(result.arbol); toast.success(`AST generado — programa: ${result.programa}`); }
       else {
         const primer = result.errores[0]; toast.error(primer ? `Error ${primer.tipo}: ${primer.mensaje}` : 'No se pudo generar el AST.'); setActiveTab('consola');
-        if (primer) { addLine('error', `[AST] ${primer.tipo.toUpperCase()} L${primer.linea??'?'}: ${primer.mensaje}`); if (primer.sugerencia) addLine('warn', `  💡 ${primer.sugerencia}`); }
+        if (primer) { addLine('error', `[AST] ${primer.tipo.toUpperCase()} L${primer.linea ?? '?'}: ${primer.mensaje}`); if (primer.sugerencia) addLine('warn', `  💡 ${primer.sugerencia}`); }
       }
     } catch (err: unknown) {
       const axiosErr = err as { response?: { status?: number } };
@@ -1075,18 +981,8 @@ export function EditorPage() {
           <header style={styles.topbar}>
             <div><p style={styles.topbarSub}>Compilador UMG++ — Motor v2.0</p><h1 style={styles.topbarTitle}>Editor de Código</h1></div>
             <div style={styles.topbarRight}>
-
-              {/* Menú Archivo */}
-              <MenuArchivo
-                onNuevo={handleNuevo}
-                onAbrir={handleAbrirArchivo}
-                onVerHistorial={() => setHistorialOpen(true)}
-                archivoActualId={archivoId}
-              />
-
+              <MenuArchivo onNuevo={handleNuevo} onAbrir={handleAbrirArchivo} onVerHistorial={() => setHistorialOpen(true)} archivoActualId={archivoId} />
               <div style={styles.topbarSep} />
-
-              {/* Coreografías */}
               <div ref={choreoRef} style={{ position: 'relative' }}>
                 <button onClick={handleAbrirChoreo} style={styles.btnChoreo}><IconMusic />Coreografías</button>
                 {choreoOpen && (
@@ -1105,7 +1001,6 @@ export function EditorPage() {
                   </div>
                 )}
               </div>
-
               <select value={selectedLang} onChange={e => setSelectedLang(e.target.value as LenguajeDestino)} style={styles.langSelect}><option value="python">Python</option><option value="csharp">C#</option></select>
               <button onClick={handleDownload} style={styles.btnSecondary}><IconDownload /> Descargar</button>
               {codigoTranspilado && <button onClick={handleDownloadTranspilado} style={styles.btnSecondary}><IconDownload /> .{selectedLang==='python'?'py':'cs'}</button>}
@@ -1156,18 +1051,7 @@ export function EditorPage() {
                   value={code}
                   onChange={val => setCode(val ?? '')}
                   onMount={(_editor, monaco) => { monacoRef.current = monaco; registrarLenguajeUmgpp(monaco); }}
-                  options={{
-                    fontSize: 13,
-                    fontFamily: 'JetBrains Mono, Fira Code, monospace',
-                    minimap: { enabled: false },
-                    lineNumbers: 'on',
-                    scrollBeyondLastLine: false,
-                    padding: { top: 12, bottom: 12 },
-                    renderLineHighlight: 'line',
-                    cursorBlinking: 'smooth',
-                    smoothScrolling: true,
-                    wordWrap: 'on',
-                  }}
+                  options={{ fontSize: 13, fontFamily: 'JetBrains Mono, Fira Code, monospace', minimap: { enabled: false }, lineNumbers: 'on', scrollBeyondLastLine: false, padding: { top: 12, bottom: 12 }, renderLineHighlight: 'line', cursorBlinking: 'smooth', smoothScrolling: true, wordWrap: 'on' }}
                 />
               </div>
             </div>
@@ -1248,12 +1132,7 @@ export function EditorPage() {
 
       {/* Modal Historial */}
       {historialOpen && archivoId && (
-        <ModalHistorial
-          archivoId={archivoId}
-          archivoNombre={archivoNombre}
-          onRestaurar={handleRestaurarVersion}
-          onCerrar={() => setHistorialOpen(false)}
-        />
+        <ModalHistorial archivoId={archivoId} archivoNombre={archivoNombre} onRestaurar={handleRestaurarVersion} onCerrar={() => setHistorialOpen(false)} />
       )}
     </>
   );
