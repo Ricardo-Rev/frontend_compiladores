@@ -24,12 +24,12 @@ export interface RoverProgresoPayload {
 }
 
 interface UseRoverSignalROptions {
-  onStatus:       (data: RoverStatusPayload)   => void;
-  onAck:          (data: RoverAckPayload)       => void;
-  onProgreso:     (data: RoverProgresoPayload)  => void;
-  onConnected:    () => void;
+  onStatus: (data: RoverStatusPayload) => void;
+  onAck: (data: RoverAckPayload) => void;
+  onProgreso: (data: RoverProgresoPayload) => void;
+  onConnected: () => void;
   onDisconnected: () => void;
-  onError:        (msg: string) => void;
+  onError: (msg: string) => void;
 }
 
 // ── Hook ──────────────────────────────────────────────────────
@@ -38,7 +38,10 @@ export function useRoverSignalR(options: UseRoverSignalROptions) {
 
   // Guardar callbacks en ref para no recrear las funciones
   const optionsRef = useRef(options);
-  optionsRef.current = options;
+
+  useEffect(() => {
+    optionsRef.current = options;
+  }, [options]);
 
   const connect = useCallback(async () => {
     // Cerrar conexión anterior si existe
