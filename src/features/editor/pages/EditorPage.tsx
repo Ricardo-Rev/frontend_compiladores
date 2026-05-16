@@ -55,6 +55,12 @@ const IconHistory      = () => (<svg width="15" height="15" viewBox="0 0 24 24" 
 const IconRotateCcw    = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>);
 const IconX            = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>);
 const IconCheckCircle  = () => (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>);
+// ── NUEVOS ÍCONOS ────────────────────────────────────────────
+const IconStop         = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>);
+const IconPause        = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>);
+const IconVolume       = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>);
+const IconVolumeX      = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>);
+const IconMusicNote    = () => (<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>);
 
 // ── Indicador de autoguardado ────────────────────────────────
 function AutoSaveIndicator({ status, lastSavedAt }: { status: SaveStatus; lastSavedAt: Date | null }) {
@@ -318,29 +324,17 @@ function AstNodo({ nodo, depth = 0 }: { nodo: AstNodoDto; depth?: number }) {
   );
 }
 
-// ══════════════════════════════════════════════════════════════
-// SIMULACIÓN — CORREGIDA
-//
-// Cambios vs versión anterior:
-//   1. girar(1)  → arco de pivote real a la DERECHA (90°)
-//      La rueda derecha es el pivote, la izquierda describe el arco.
-//   2. girar(-1) → arco de pivote real a la IZQUIERDA (90°)
-//   3. girar(0)  → avanza RECTO 10cm (según spec: "ambos motores, línea recta")
-//   4. avanzar_vlts → escala correcta: 20.4cm por vuelta (llanta Ø 6.5cm)
-// ══════════════════════════════════════════════════════════════
+// ── Simulación ────────────────────────────────────────────────
 interface SimPoint   { x: number; y: number; angle: number; }
 interface SimSegment { points: SimPoint[]; instrIdx: number; }
 
-// 60px = 1 metro = 100cm → escala de la simulación
 const METRO_PX = 60;
-// Distancia entre ruedas para el pivote (visual, ligeramente ampliada para claridad)
 const WHEEL_BASE_PX = 18;
-// Circunferencia real de la llanta: π × 6.5cm ≈ 20.4cm
 const CM_POR_VUELTA = 20.4;
 
 function calcularTrayectoria(instrucciones: InstruccionDto[]): SimSegment[] {
   const segments: SimSegment[] = [];
-  let x = 0, y = 0, angle = -Math.PI / 2; // ángulo inicial: apunta hacia arriba
+  let x = 0, y = 0, angle = -Math.PI / 2;
 
   for (let idx = 0; idx < instrucciones.length; idx++) {
     const inst  = instrucciones[idx];
@@ -348,7 +342,6 @@ function calcularTrayectoria(instrucciones: InstruccionDto[]): SimSegment[] {
     const nombre = inst.nombre.toLowerCase();
     const pts: SimPoint[] = [{ x, y, angle }];
 
-    // ── helper: avanzar N píxeles en la dirección actual ──────
     const avanzarPx = (px: number, dir: number, steps: number) => {
       for (let s = 1; s <= steps; s++) {
         x += Math.cos(angle) * (px / steps) * dir;
@@ -359,108 +352,60 @@ function calcularTrayectoria(instrucciones: InstruccionDto[]): SimSegment[] {
 
     if (nombre === 'avanzar_mts') {
       avanzarPx(Math.abs(n) * METRO_PX, n > 0 ? 1 : -1, 40);
-
     } else if (nombre === 'avanzar_ctms') {
-      // METRO_PX / 100 = píxeles por centímetro
       avanzarPx(Math.abs(n) * METRO_PX / 100, n > 0 ? 1 : -1, Math.max(10, Math.abs(n)));
-
     } else if (nombre === 'avanzar_vlts') {
-      // 1 vuelta = CM_POR_VUELTA cm = CM_POR_VUELTA * METRO_PX/100 px
-      const pxPerVuelta = CM_POR_VUELTA * METRO_PX / 100; // ≈ 12.24 px
+      const pxPerVuelta = CM_POR_VUELTA * METRO_PX / 100;
       avanzarPx(Math.abs(n) * pxPerVuelta, n > 0 ? 1 : -1, 20);
-
     } else if (nombre === 'girar') {
-
       if (n === 0) {
-        // girar(0) = AMBOS motores = avanzar recto 10cm
         avanzarPx(10 * METRO_PX / 100, 1, 10);
-
       } else {
-        // girar(1)  = solo motor IZQ → pivote a la DERECHA (+90°)
-        // girar(-1) = solo motor DER → pivote a la IZQUIERDA (-90°)
         const dir = n > 0 ? 1 : -1;
         const steps = 24;
-
-        // El punto de pivote está perpendicular a la dirección actual
-        // a una distancia de WHEEL_BASE_PX (la rueda que no se mueve)
         const pivotAngle = angle + dir * Math.PI / 2;
         const pivotX = x + Math.cos(pivotAngle) * WHEEL_BASE_PX;
         const pivotY = y + Math.sin(pivotAngle) * WHEEL_BASE_PX;
-
         for (let s = 1; s <= steps; s++) {
-          const newAngle     = angle + dir * (Math.PI / 2 * s / steps);
-          // Centro del rover: siempre a WHEEL_BASE_PX del pivote,
-          // en la dirección opuesta al pivote relativo al nuevo ángulo
-          const backAngle    = newAngle - dir * Math.PI / 2;
+          const newAngle  = angle + dir * (Math.PI / 2 * s / steps);
+          const backAngle = newAngle - dir * Math.PI / 2;
           x = pivotX + Math.cos(backAngle) * WHEEL_BASE_PX;
           y = pivotY + Math.sin(backAngle) * WHEEL_BASE_PX;
           pts.push({ x, y, angle: newAngle });
         }
         angle += dir * Math.PI / 2;
-        // Sincronizar x,y con el último punto calculado
-        if (pts.length > 1) {
-          x = pts[pts.length - 1].x;
-          y = pts[pts.length - 1].y;
-        }
+        if (pts.length > 1) { x = pts[pts.length - 1].x; y = pts[pts.length - 1].y; }
       }
-
     } else if (nombre === 'circulo') {
       const r = Math.abs(n) * METRO_PX / 100;
       const sa = angle;
       for (let s = 1; s <= 80; s++) {
         const a = sa + (Math.PI * 2 * s) / 80;
-        pts.push({
-          x: x + Math.cos(a) * r - Math.cos(sa) * r,
-          y: y + Math.sin(a) * r - Math.sin(sa) * r,
-          angle: a + Math.PI / 2,
-        });
+        pts.push({ x: x + Math.cos(a) * r - Math.cos(sa) * r, y: y + Math.sin(a) * r - Math.sin(sa) * r, angle: a + Math.PI / 2 });
       }
-      // Posición final = igual que inicio (círculo completo)
-
     } else if (nombre === 'cuadrado') {
       const lado = Math.abs(n) * METRO_PX / 100;
-      // Calcular tiempo de pivote de 90° con la misma fórmula que girar
       for (let side = 0; side < 4; side++) {
-        // Avanzar lado
-        for (let s = 1; s <= 15; s++) {
-          x += Math.cos(angle) * (lado / 15);
-          y += Math.sin(angle) * (lado / 15);
-          pts.push({ x, y, angle });
-        }
-        // Pivote 90° (ambos motores opuestos = giro en punto fijo)
-        const pivotSteps = 16;
+        for (let s = 1; s <= 15; s++) { x += Math.cos(angle) * (lado / 15); y += Math.sin(angle) * (lado / 15); pts.push({ x, y, angle }); }
         const cx = x, cy = y;
-        for (let s = 1; s <= pivotSteps; s++) {
-          const newAngle = angle + (Math.PI / 2 * s / pivotSteps);
-          pts.push({ x: cx, y: cy, angle: newAngle });
-        }
+        for (let s = 1; s <= 16; s++) { const na = angle + (Math.PI / 2 * s / 16); pts.push({ x: cx, y: cy, angle: na }); }
         angle += Math.PI / 2;
       }
-
     } else if (nombre === 'rotar') {
-      const vueltas = Math.abs(n);
-      const dir     = n > 0 ? 1 : -1;
-      for (let s = 1; s <= 40; s++) {
-        angle += (Math.PI * 2 * vueltas * dir) / 40;
-        pts.push({ x, y, angle });
-      }
-
+      const vueltas = Math.abs(n); const dir = n > 0 ? 1 : -1;
+      for (let s = 1; s <= 40; s++) { angle += (Math.PI * 2 * vueltas * dir) / 40; pts.push({ x, y, angle }); }
     } else if (nombre === 'caminar') {
       avanzarPx(Math.abs(n) * METRO_PX * 0.18, n > 0 ? 1 : -1, 25);
-
     } else if (nombre === 'moonwalk') {
-      avanzarPx(Math.abs(n) * METRO_PX * 0.18, n > 0 ? -1 : 1, 25);
-
+      avanzarPx(Math.abs(n) * METRO_PX * 0.18, n > 0 ? 1 : -1, 25);
     } else {
       pts.push({ x, y, angle });
     }
-
     segments.push({ points: pts, instrIdx: idx });
   }
   return segments;
 }
 
-// ── Componente Simulador ──────────────────────────────────────
 interface SimuladorProps { instrucciones: InstruccionDto[]; activeInstrIdx: number; animProgress: number; }
 
 function Simulador({ instrucciones, activeInstrIdx, animProgress }: SimuladorProps) {
@@ -491,11 +436,7 @@ function Simulador({ instrucciones, activeInstrIdx, animProgress }: SimuladorPro
 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      zoomRef.current = Math.min(Math.max(zoomRef.current * (e.deltaY < 0 ? 1.12 : 0.88), 0.1), 10);
-      setZoomDisplay(Math.round(zoomRef.current * 100));
-    };
+    const onWheel = (e: WheelEvent) => { e.preventDefault(); zoomRef.current = Math.min(Math.max(zoomRef.current * (e.deltaY < 0 ? 1.12 : 0.88), 0.1), 10); setZoomDisplay(Math.round(zoomRef.current * 100)); };
     canvas.addEventListener('wheel', onWheel, { passive: false });
     return () => canvas.removeEventListener('wheel', onWheel);
   }, []);
@@ -512,22 +453,18 @@ function Simulador({ instrucciones, activeInstrIdx, animProgress }: SimuladorPro
     const ox = autoOffRef.current.x + offsetRef.current.x;
     const oy = autoOffRef.current.y + offsetRef.current.y;
     ctx.save(); ctx.translate(ox, oy); ctx.scale(totalZoom, totalZoom);
-    // Grid
     const gridStep = METRO_PX / 2;
     ctx.strokeStyle = 'rgba(56,189,248,0.05)'; ctx.lineWidth = 0.5 / totalZoom;
     const gx0 = -ox/totalZoom, gy0 = -oy/totalZoom, gxN = (W-ox)/totalZoom, gyN = (H-oy)/totalZoom;
     for (let gx = Math.floor(gx0/gridStep)*gridStep; gx <= gxN; gx += gridStep) { ctx.beginPath(); ctx.moveTo(gx,gy0); ctx.lineTo(gx,gyN); ctx.stroke(); }
     for (let gy = Math.floor(gy0/gridStep)*gridStep; gy <= gyN; gy += gridStep) { ctx.beginPath(); ctx.moveTo(gx0,gy); ctx.lineTo(gxN,gy); ctx.stroke(); }
-    // Origen
     ctx.beginPath(); ctx.arc(0,0,4/totalZoom,0,Math.PI*2); ctx.fillStyle='rgba(56,189,248,0.6)'; ctx.fill();
     ctx.strokeStyle='rgba(56,189,248,0.4)'; ctx.lineWidth=1/totalZoom; ctx.beginPath(); ctx.arc(0,0,10/totalZoom,0,Math.PI*2); ctx.stroke();
     if (segRef.current.length === 0) { ctx.restore(); return; }
-    // Trayectoria fantasma
     ctx.setLineDash([4/totalZoom,4/totalZoom]); ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=1/totalZoom; ctx.beginPath();
     let firstPt = true;
     for (const seg of segRef.current) { for (const pt of seg.points) { if (firstPt) { ctx.moveTo(pt.x,pt.y); firstPt=false; } else ctx.lineTo(pt.x,pt.y); } }
     ctx.stroke(); ctx.setLineDash([]);
-    // Segmentos activos
     for (let i = 0; i <= Math.min(activeInstrIdx, segRef.current.length-1); i++) {
       const seg = segRef.current[i]; if (!seg) continue;
       const isActive = i === activeInstrIdx;
@@ -536,7 +473,6 @@ function Simulador({ instrucciones, activeInstrIdx, animProgress }: SimuladorPro
       let f=true; for (const pt of pts) { if(f){ctx.moveTo(pt.x,pt.y);f=false;}else ctx.lineTo(pt.x,pt.y); } ctx.stroke();
       const p0=seg.points[0]; ctx.beginPath(); ctx.arc(p0.x,p0.y,(isActive?3:2)/totalZoom,0,Math.PI*2); ctx.fillStyle=isActive?'#38bdf8':'rgba(56,189,248,0.5)'; ctx.fill();
     }
-    // Rover animado
     const activeSeg = segRef.current[Math.min(activeInstrIdx, segRef.current.length-1)];
     if (activeSeg && activeInstrIdx >= 0) {
       const pts=activeSeg.points; const rawIdx=animProgress*(pts.length-1);
@@ -646,10 +582,19 @@ export function EditorPage() {
   const [historialOpen, setHistorialOpen] = useState(false);
   const [archivoId, setArchivoId]         = useState<number | null>(null);
 
+  // ── NUEVAS VARIABLES DE ESTADO: Audio + STOP ─────────────────
+  const audioRef                        = useRef<HTMLAudioElement | null>(null);
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  const [audioVolume, setAudioVolume]   = useState(0.8);
+  const [cancionActual, setCancionActual] = useState<string | null>(null);
+  const [cancionUrl, setCancionUrl]     = useState<string | null>(null);
+  const [roverActivo, setRoverActivo]   = useState(false);
+  const [isStopping, setIsStopping]     = useState(false);
+
   const { status: saveStatus, lastSavedAt, restoreFromLocal, getLocalTimestamp, getLocalArchivoId, markAsSaved, clearLocal } =
     useAutoSave({ code, archivoId, setArchivoId });
 
-  // ── SignalR — reemplaza el WebSocket raw ─────────────────────
+  // ── SignalR ──────────────────────────────────────────────────
   const addLine = useCallback((type: OutputLine['type'], text: string) =>
     setConsolaLines(prev => [...prev, { type, text }]), []);
 
@@ -667,6 +612,9 @@ export function EditorPage() {
       if (data.estado === 'ok') {
         addLine('success', `✅ ACK recibido: ${data.mensaje}`);
       } else if (data.estado === 'completado') {
+        // ── NUEVO: detener música cuando el rover termina ──────
+        detenerMusica();
+        setRoverActivo(false);
         addLine('success', '🏁 Rover completó la ejecución');
         toast.success('Rover completó la ejecución 🏁');
         disconnectSignalR();
@@ -674,6 +622,9 @@ export function EditorPage() {
         addLine('error', `❌ Error en rover: ${data.mensaje}`);
         toast.error(`Error en rover: ${data.mensaje}`);
       } else if (data.estado === 'stopped') {
+        // ── NUEVO: detener música cuando llega STOP ────────────
+        detenerMusica();
+        setRoverActivo(false);
         addLine('warn', '⚠️ Rover detenido por STOP de emergencia');
       }
     },
@@ -682,6 +633,91 @@ export function EditorPage() {
       addLine('info', `🤖 Rover → instrucción ${data.progreso}/${data.total}`);
     },
   });
+
+  // ── NUEVO: Inicializar elemento de audio ────────────────────
+  useEffect(() => {
+    const audio = new Audio();
+    audio.volume = audioVolume;
+    const onEnded = () => setAudioPlaying(false);
+    audio.addEventListener('ended', onEnded);
+    audioRef.current = audio;
+    return () => {
+      audio.removeEventListener('ended', onEnded);
+      audio.pause();
+      audioRef.current = null;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── NUEVO: Recargar audio cuando cambia la URL ──────────────
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      setAudioPlaying(false);
+      if (cancionUrl) {
+        audioRef.current.src = cancionUrl;
+        audioRef.current.load();
+      } else {
+        audioRef.current.src = '';
+      }
+    }
+  }, [cancionUrl]);
+
+  // ── NUEVO: Helper para detener la música ────────────────────
+  const detenerMusica = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setAudioPlaying(false);
+    }
+  }, []);
+
+  // ── NUEVO: Toggle play/pause del audio ──────────────────────
+  const handleToggleAudio = useCallback(() => {
+    if (!audioRef.current || !cancionUrl) return;
+    if (audioPlaying) {
+      audioRef.current.pause();
+      setAudioPlaying(false);
+    } else {
+      audioRef.current.play()
+        .then(() => setAudioPlaying(true))
+        .catch(() => toast.error('No se pudo reproducir la canción. Verifica la URL en el backend.'));
+    }
+  }, [audioPlaying, cancionUrl]);
+
+  // ── NUEVO: Cambiar volumen ───────────────────────────────────
+  const handleVolumeChange = useCallback((vol: number) => {
+    setAudioVolume(vol);
+    if (audioRef.current) audioRef.current.volume = vol;
+  }, []);
+
+  // ── NUEVO: STOP de emergencia ────────────────────────────────
+  const handleStop = async () => {
+    detenerMusica();
+    setRoverActivo(false);
+    setIsStopping(true);
+    try {
+      const token = localStorage.getItem('rover_token');
+      const res = await fetch(`${API_URL}/api/Rover/stop`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        addLine('warn', '🛑 STOP de emergencia enviado al rover');
+        toast.warning('🛑 Rover detenido');
+        setActiveTab('consola');
+        disconnectSignalR();
+      } else {
+        addLine('error', `❌ Error al enviar STOP: ${data.error ?? 'desconocido'}`);
+        toast.error('Error al enviar STOP al rover');
+      }
+    } catch {
+      addLine('error', '❌ Error de conexión al enviar STOP');
+      toast.error('Error de conexión');
+    } finally {
+      setIsStopping(false);
+    }
+  };
 
   // ── Restaurar al montar ──────────────────────────────────────
   useEffect(() => {
@@ -709,7 +745,12 @@ export function EditorPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  useEffect(() => () => { cancelAnimationFrame(rafRef.current); disconnectSignalR(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // ── MODIFICADO: cleanup incluye audio ───────────────────────
+  useEffect(() => () => {
+    cancelAnimationFrame(rafRef.current);
+    disconnectSignalR();
+    audioRef.current?.pause();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onDragDiv1 = useCallback((dx: number) => {
     const total = containerRef.current?.clientWidth ?? 1; const pct = (dx / total) * 100;
@@ -726,19 +767,26 @@ export function EditorPage() {
     setCameraHeightPct(prev => Math.max(15, Math.min(75, prev + pct)));
   }, []);
 
-  const handleLogout = async () => { try { await logoutUser(); } finally { logout(); toast.success('Sesión cerrada.'); navigate('/login'); } };
+  const handleLogout = async () => {
+    detenerMusica();
+    try { await logoutUser(); } finally { logout(); toast.success('Sesión cerrada.'); navigate('/login'); }
+  };
 
-  // ── Menú Archivo: Nuevo ──────────────────────────────────────
+  // ── MODIFICADO: Nuevo — limpia audio ─────────────────────────
   const handleNuevo = useCallback(() => {
+    detenerMusica();
+    setCancionActual(null);
+    setCancionUrl(null);
+    setRoverActivo(false);
     setCode(''); setArchivoNombre('nuevo_programa.umgpp'); setArchivoId(null); clearLocal();
     setConsolaLines([]); setTokens([]); setInstrucciones([]);
     setCodigoTranspilado(''); setAstData(null); setSimActiveIdx(-1); setAnimProgress(0);
     cancelAnimationFrame(rafRef.current); setIsSimulating(false); simStateRef.current.running = false;
     setActiveTab('consola');
     toast.success('Nuevo archivo — empieza a escribir tu código');
-  }, [clearLocal]);
+  }, [clearLocal, detenerMusica]);
 
-  // ── Menú Archivo: Abrir ──────────────────────────────────────
+  // ── Abrir archivo ────────────────────────────────────────────
   const handleAbrirArchivo = useCallback(async (archivo: FileListResponse) => {
     try {
       const detalle = await obtenerArchivo(archivo.id);
@@ -756,7 +804,7 @@ export function EditorPage() {
     } catch { toast.error('No se pudo abrir el archivo.'); }
   }, [markAsSaved, addLine]);
 
-  // ── Historial: Restaurar ─────────────────────────────────────
+  // ── Restaurar versión ────────────────────────────────────────
   const handleRestaurarVersion = useCallback((contenido: string, version: number) => {
     setCode(contenido); setHistorialOpen(false);
     setConsolaLines([]); setTokens([]); setInstrucciones([]);
@@ -847,7 +895,7 @@ export function EditorPage() {
     rafRef.current = requestAnimationFrame(animate);
   }, [instrucciones, isSimulating]);
 
-  // ── Enviar Rover — usa SignalR en lugar de WebSocket raw ─────
+  // ── MODIFICADO: Enviar al Rover — auto-inicia música ─────────
   const handleEnviarRover = async () => {
     if (!lastCompilacionId) { toast.error('Compila primero antes de enviar al rover.'); return; }
     setIsSendingRover(true);
@@ -863,7 +911,14 @@ export function EditorPage() {
         addLine('success', `🚀 Instrucciones enviadas al rover (transmisión #${data.transmision_id})`);
         addLine('info', `📡 ${data.total_instrucciones} instrucciones publicadas vía MQTT`);
         toast.success('¡Instrucciones enviadas al rover! 🤖'); setActiveTab('consola');
-        // Conectar SignalR para recibir ACKs en tiempo real
+        setRoverActivo(true);
+        // ── NUEVO: reproducir música si hay canción cargada ────
+        if (cancionUrl && audioRef.current) {
+          audioRef.current.currentTime = 0;
+          audioRef.current.play()
+            .then(() => { setAudioPlaying(true); addLine('info', `🎵 Reproduciendo: ${cancionActual ?? 'canción'}`); })
+            .catch(() => addLine('warn', '🔇 No se pudo iniciar la música automáticamente — usa el reproductor'));
+        }
         await connectSignalR();
       } else {
         addLine('error', `❌ ${data.error ?? 'Error al enviar al rover'}`);
@@ -891,7 +946,7 @@ export function EditorPage() {
     } finally { setIsLoadingAst(false); }
   };
 
-  // ── Coreografías ─────────────────────────────────────────────
+  // ── MODIFICADO: Coreografías — captura cancion_url ───────────
   const handleAbrirChoreo = async () => {
     setChoreoOpen(prev => !prev);
     if (choreoList.length === 0) {
@@ -905,12 +960,24 @@ export function EditorPage() {
   const handleCargarChoreo = async (id: number, nombre: string) => {
     setChoreoLoadingId(id);
     try {
-      const detalle = await obtenerCoreografia(id); setCode(detalle.codigo_fuente); setChoreoOpen(false);
+      const detalle = await obtenerCoreografia(id);
+      setCode(detalle.codigo_fuente);
+      setChoreoOpen(false);
       setConsolaLines([]); setTokens([]); setInstrucciones([]); setCodigoTranspilado('');
       setAstData(null); setSimActiveIdx(-1); setAnimProgress(0); setActiveTab('consola');
+      cancelAnimationFrame(rafRef.current); setIsSimulating(false); simStateRef.current.running = false;
       addLine('info', `🎵 Coreografía cargada: ${nombre}`);
-      if (detalle.cancion_nombre) addLine('info', `🎶 Canción: ${detalle.cancion_nombre}`);
-      toast.success(`Coreografía "${nombre}" cargada en el editor`);
+      // ── NUEVO: cargar canción de la coreografía ─────────────
+      if (detalle.cancion_url) {
+        setCancionUrl(detalle.cancion_url);
+        setCancionActual(detalle.cancion_nombre ?? nombre);
+        addLine('info', `🎶 Canción lista: ${detalle.cancion_nombre ?? 'sin nombre'}`);
+        toast.success(`Coreografía "${nombre}" cargada · 🎶 ${detalle.cancion_nombre ?? 'con música'}`);
+      } else {
+        setCancionUrl(null);
+        setCancionActual(null);
+        toast.success(`Coreografía "${nombre}" cargada en el editor`);
+      }
     } catch { toast.error('Error al cargar la coreografía.'); }
     finally { setChoreoLoadingId(null); }
   };
@@ -950,7 +1017,11 @@ export function EditorPage() {
   // ── Render ───────────────────────────────────────────────────
   return (
     <>
-      <style>{`@keyframes autosavePulse { 0%,100%{opacity:1} 50%{opacity:0.25} }`}</style>
+      <style>{`
+        @keyframes autosavePulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
+        @keyframes stopPulse { 0%,100%{box-shadow:0 0 0 0 rgba(248,113,113,0.5)} 50%{box-shadow:0 0 0 8px rgba(248,113,113,0)} }
+        @keyframes musicBar { 0%,100%{height:4px} 50%{height:12px} }
+      `}</style>
       <div style={styles.shell}>
         <div style={styles.bgOrb1} /><div style={styles.bgOrb2} />
 
@@ -1008,17 +1079,71 @@ export function EditorPage() {
               <div style={styles.topbarSep} />
               <button onClick={handleSimular} style={{ ...styles.btnSimular, background: isSimulating?'rgba(251,191,36,0.18)':'rgba(251,191,36,0.08)', borderColor: isSimulating?'rgba(251,191,36,0.6)':'rgba(251,191,36,0.3)' }}><IconSimulate />{isSimulating?'Detener':'Simular'}</button>
               <button onClick={handleEnviarRover} disabled={isSendingRover||!lastCompilacionId} style={{ ...styles.btnRover, opacity:(isSendingRover||!lastCompilacionId)?0.5:1, cursor:(isSendingRover||!lastCompilacionId)?'not-allowed':'pointer' }}><IconRover />{isSendingRover?'Enviando...':'Enviar al Rover'}</button>
+              {/* ── NUEVO: Botón STOP prominente ──────────────── */}
+              <button
+                onClick={handleStop}
+                disabled={isStopping}
+                title="Detener rover y música de emergencia"
+                style={{
+                  ...styles.btnStop,
+                  animation: roverActivo ? 'stopPulse 1.5s ease-in-out infinite' : 'none',
+                  opacity: isStopping ? 0.7 : 1,
+                  cursor: isStopping ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <IconStop />{isStopping ? 'Deteniendo...' : '⬛ STOP'}
+              </button>
               <button onClick={handleClear} style={styles.btnDanger}><IconTrash /> Limpiar</button>
               <button onClick={handleCompile} disabled={isCompiling} style={{ ...styles.btnPrimary, opacity:isCompiling?0.7:1, cursor:isCompiling?'not-allowed':'pointer' }}><IconPlay />{isCompiling?'Compilando...':'Compilar'}</button>
             </div>
           </header>
+
+          {/* ── NUEVO: Mini reproductor de música ─────────────── */}
+          {cancionUrl && (
+            <div style={styles.musicPlayer}>
+              {/* Barras de visualización */}
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: '16px', flexShrink: 0 }}>
+                {[0, 80, 160, 240, 320].map((delay, i) => (
+                  <div key={i} style={{ width: '3px', borderRadius: '2px', background: '#f472b6', height: audioPlaying ? undefined : '4px', animation: audioPlaying ? `musicBar 0.6s ease-in-out infinite ${delay}ms` : 'none', minHeight: '4px' }} />
+                ))}
+              </div>
+              <IconMusicNote />
+              <span style={styles.musicPlayerNombre}>{cancionActual ?? 'Canción de coreografía'}</span>
+              {/* Controles */}
+              <button onClick={handleToggleAudio} style={styles.musicPlayerBtn} title={audioPlaying ? 'Pausar' : 'Reproducir'}>
+                {audioPlaying ? <IconPause /> : <IconPlay />}
+              </button>
+              <button
+                onClick={() => handleVolumeChange(audioVolume > 0 ? 0 : 0.8)}
+                style={{ ...styles.musicPlayerBtn, color: audioVolume === 0 ? 'var(--danger)' : '#f472b6' }}
+                title={audioVolume === 0 ? 'Activar sonido' : 'Silenciar'}
+              >
+                {audioVolume === 0 ? <IconVolumeX /> : <IconVolume />}
+              </button>
+              <input
+                type="range" min="0" max="1" step="0.05" value={audioVolume}
+                onChange={e => handleVolumeChange(parseFloat(e.target.value))}
+                style={styles.musicVolumeSlider}
+                title={`Volumen: ${Math.round(audioVolume * 100)}%`}
+              />
+              <span style={{ color: '#f472b6', fontSize: '0.65rem', fontFamily: 'var(--font-mono)', opacity: 0.7 }}>{Math.round(audioVolume * 100)}%</span>
+              {roverActivo && (
+                <span style={{ fontSize: '0.65rem', color: 'var(--accent3)', background: 'rgba(52,211,153,0.12)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(52,211,153,0.3)' }}>
+                  🤖 EN EJECUCIÓN
+                </span>
+              )}
+              <button onClick={detenerMusica} style={{ ...styles.musicPlayerBtn, marginLeft: 'auto', opacity: 0.6 }} title="Cerrar reproductor">
+                <IconX />
+              </button>
+            </div>
+          )}
 
           {/* Stats */}
           <div style={styles.statsRow}>
             {[
               { label: 'Compilaciones',    value: compilaciones,                                                   color: 'var(--accent)'  },
               { label: 'Lenguaje destino', value: selectedLang.toUpperCase(),                                      color: 'var(--accent2)' },
-              { label: 'Estado',           value: isCompiling?'Compilando...':isSimulating?'Simulando...':'Listo', color: isSimulating?'#fbbf24':'var(--accent3)' },
+              { label: 'Estado',           value: isCompiling?'Compilando...':isSimulating?'Simulando...':roverActivo?'Rover activo':'Listo', color: roverActivo?'var(--danger)':isSimulating?'#fbbf24':'var(--accent3)' },
               { label: 'Líneas',           value: code.split('\n').length,                                         color: 'var(--warning)' },
               { label: 'Tiempo',           value: lastTiempoMs!==null?`${lastTiempoMs}ms`:'—',                    color: 'var(--text-muted)' },
             ].map(s => (
@@ -1134,6 +1259,21 @@ export function EditorPage() {
       {historialOpen && archivoId && (
         <ModalHistorial archivoId={archivoId} archivoNombre={archivoNombre} onRestaurar={handleRestaurarVersion} onCerrar={() => setHistorialOpen(false)} />
       )}
+
+      {/* ── NUEVO: Botón flotante STOP de emergencia ─────────── */}
+      {roverActivo && (
+        <button
+          onClick={handleStop}
+          disabled={isStopping}
+          title="STOP de emergencia — detiene rover y música"
+          style={styles.btnStopFlotante}
+        >
+          <IconStop />
+          <span style={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '1px' }}>
+            {isStopping ? 'DETENIENDO' : 'STOP'}
+          </span>
+        </button>
+      )}
     </>
   );
 }
@@ -1161,7 +1301,7 @@ const styles: Record<string, React.CSSProperties> = {
   sidebarUserRole:   { color:'var(--text-muted)', fontSize:'0.7rem' },
   logoutBtn:         { background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer', padding:'0.4rem', borderRadius:'6px', display:'flex', alignItems:'center', flexShrink:0 },
   collapseBtn:       { position:'absolute', top:'50%', right:'-12px', transform:'translateY(-50%)', width:'24px', height:'24px', borderRadius:'50%', background:'var(--bg-elevated)', border:'1px solid var(--border)', color:'var(--text-secondary)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.875rem', zIndex:20 },
-  main:              { flex:1, display:'flex', flexDirection:'column', padding:'1.5rem', gap:'1rem', overflow:'hidden', position:'relative', zIndex:1 },
+  main:              { flex:1, display:'flex', flexDirection:'column', padding:'1.5rem', gap:'0.75rem', overflow:'hidden', position:'relative', zIndex:1 },
   topbar:            { display:'flex', justifyContent:'space-between', alignItems:'flex-end', flexShrink:0 },
   topbarSub:         { color:'var(--text-muted)', fontSize:'0.8rem', margin:0 },
   topbarTitle:       { color:'var(--text-primary)', fontSize:'1.5rem', fontWeight:'700', margin:'0.2rem 0 0', fontFamily:'var(--font-brand)', letterSpacing:'1px' },
@@ -1175,6 +1315,14 @@ const styles: Record<string, React.CSSProperties> = {
   btnChoreo:         { display:'flex', alignItems:'center', gap:'0.4rem', background:'rgba(244,114,182,0.1)', border:'1px solid rgba(244,114,182,0.3)', color:'#f472b6', borderRadius:'8px', padding:'0.55rem 0.9rem', fontSize:'0.825rem', cursor:'pointer', fontWeight:'600' },
   btnSimular:        { display:'flex', alignItems:'center', gap:'0.4rem', border:'1px solid', color:'#fbbf24', borderRadius:'8px', padding:'0.55rem 0.9rem', fontSize:'0.825rem', fontWeight:'600', cursor:'pointer' },
   btnRover:          { display:'flex', alignItems:'center', gap:'0.4rem', background:'rgba(52,211,153,0.1)', border:'1px solid rgba(52,211,153,0.3)', color:'var(--accent3)', borderRadius:'8px', padding:'0.55rem 0.9rem', fontSize:'0.825rem', fontWeight:'600', cursor:'pointer' },
+  // ── NUEVOS ESTILOS ────────────────────────────────────────
+  btnStop:           { display:'flex', alignItems:'center', gap:'0.4rem', background:'rgba(248,113,113,0.15)', border:'2px solid rgba(248,113,113,0.6)', color:'#f87171', borderRadius:'8px', padding:'0.55rem 1rem', fontSize:'0.85rem', fontWeight:'800', cursor:'pointer', letterSpacing:'0.5px', transition:'all 0.2s' },
+  btnStopFlotante:   { position:'fixed', bottom:'24px', right:'24px', zIndex:999, display:'flex', flexDirection:'column', alignItems:'center', gap:'4px', background:'rgba(220,38,38,0.95)', border:'2px solid rgba(248,113,113,0.8)', color:'#fff', borderRadius:'50px', padding:'14px 20px', fontSize:'0.85rem', fontWeight:'800', cursor:'pointer', letterSpacing:'1px', animation:'stopPulse 1.5s ease-in-out infinite', boxShadow:'0 4px 20px rgba(220,38,38,0.4)' },
+  musicPlayer:       { display:'flex', alignItems:'center', gap:'8px', background:'rgba(244,114,182,0.06)', border:'1px solid rgba(244,114,182,0.2)', borderRadius:'10px', padding:'6px 12px', flexShrink:0, minHeight:'36px' },
+  musicPlayerNombre: { color:'#f472b6', fontSize:'0.78rem', fontWeight:'600', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'220px' },
+  musicPlayerBtn:    { background:'none', border:'none', color:'#f472b6', cursor:'pointer', padding:'4px', borderRadius:'4px', display:'flex', alignItems:'center', flexShrink:0, transition:'opacity 0.2s' },
+  musicVolumeSlider: { width:'80px', accentColor:'#f472b6', cursor:'pointer', flexShrink:0 },
+  // ─────────────────────────────────────────────────────────
   btnArchivo:        { display:'flex', alignItems:'center', gap:'0.4rem', background:'var(--bg-elevated)', border:'1px solid var(--border)', color:'var(--text-secondary)', borderRadius:'8px', padding:'0.55rem 0.9rem', fontSize:'0.825rem', cursor:'pointer', fontWeight:'600' },
   archivoDropdown:   { position:'absolute', top:'calc(100% + 6px)', left:0, width:'300px', background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:'10px', zIndex:100, overflow:'hidden', boxShadow:'0 8px 32px rgba(0,0,0,0.4)' },
   archivoHeader:     { padding:'0.65rem 0.9rem', borderBottom:'1px solid var(--border)', background:'var(--bg-elevated)' },
